@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 CyberShield</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header + control bar, KPI row, then two columns: telemetry, chart and log on the left; message details on the right. */
+:root{
+  --bg:#0A0B09; --surface:#111310; --surface-2:#161914;
+  --line:rgba(214,236,170,.08); --line-2:rgba(214,236,170,.16);
+  --fg:#ECEFE3; --muted:#8F9585; --dim:#5E6457;
+  --accent:#C9F24B; --accent-soft:rgba(201,242,75,.13); --accent-ink:#151B04;
+  --warn:#F2B544; --warn-soft:rgba(242,181,68,.13);
+  --crit:#FF5D5D; --crit-soft:rgba(255,93,93,.13);
+  --cold:#71B9FF;
+  --f-ui:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,Menlo,monospace;
+  --r:16px; --ease:cubic-bezier(.2,.8,.2,1); --spring:cubic-bezier(.34,1.4,.5,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg);margin:0}
+body{font-family:var(--f-ui);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden;padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--f-mono)}
+.wrap{max-width:1440px;margin:0 auto;position:relative;z-index:1}
+[hidden]{display:none!important}
+
+.aura{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.aura i{position:absolute;border-radius:50%;filter:blur(90px);opacity:0;animation:auraIn 2s var(--ease) .1s forwards, drift 26s ease-in-out infinite alternate}
+.aura .a1{width:620px;height:380px;left:-160px;top:-180px;background:radial-gradient(closest-side,rgba(201,242,75,.32),transparent)}
+.aura .a2{width:520px;height:520px;right:-220px;top:60px;background:radial-gradient(closest-side,rgba(150,210,60,.16),transparent);animation-delay:.3s,-8s}
+@keyframes auraIn{to{opacity:1}}
+@keyframes drift{to{transform:translate3d(50px,30px,0) scale(1.1)}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));background:rgba(10,11,9,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;padding-block:12px}
+.row+.row{border-top:1px solid var(--line);padding-block:10px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em;font-size:17px}
+.logo small{display:block;font-weight:500;font-size:11.5px;color:var(--muted);letter-spacing:0}
+.pill{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border:1px solid var(--line-2);border-radius:999px;color:var(--muted);display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.pill.sim{color:var(--accent);border-color:rgba(201,242,75,.45);background:var(--accent-soft);font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.dot.on{background:var(--accent);animation:pulse 1.8s ease-out infinite}
+.dot.pause{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(201,242,75,.5)}100%{box-shadow:0 0 0 8px rgba(201,242,75,0)}}
+.spacer{flex:1}
+.lbl{font-family:var(--f-mono);font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.seg{position:relative;display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;padding:3px}
+.seg button{position:relative;z-index:1;background:none;border:0;padding:7px 16px;border-radius:9px;cursor:pointer;font-weight:700;color:var(--muted);transition:color .3s;white-space:nowrap}
+.seg button[aria-pressed="true"]{color:var(--accent-ink)}
+.seg .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:9px;background:var(--accent);transition:transform .45s var(--spring)}
+.seg[data-i="1"] .ind{transform:translateX(100%)}
+.clock b{font-family:var(--f-mono);font-size:20px;font-weight:600;margin-left:8px}
+.btn{border:1px solid var(--line-2);background:var(--surface-2);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;transition:border-color .2s,background .2s,opacity .2s;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:rgba(201,242,75,.5)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger:hover:not(:disabled){border-color:rgba(255,93,93,.6)}
+.select{appearance:none;-webkit-appearance:none;background:var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238F9585' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line-2);border-radius:10px;padding:8px 32px 8px 12px;font-weight:600;cursor:pointer;max-width:100%}
+.check{display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:var(--muted);font-weight:600}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+.sep{width:1px;height:26px;background:var(--line-2)}
+.toast{font-size:12.5px;color:var(--warn)}
+
+/* layout */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:18px 0 16px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;align-items:start}
+.left{display:grid;gap:16px;min-width:0}
+.card{position:relative;background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0;animation:rise .7s var(--ease) both}
+.card-h{display:flex;align-items:center;gap:10px 14px;margin-bottom:14px;flex-wrap:wrap}
+.card-h h2{font-size:16px;font-weight:800;margin:0}
+.card-h .r{margin-left:auto}
+.muted{color:var(--muted)}
+.badge{font-family:var(--f-mono);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px}
+.badge.stale{color:var(--warn);background:var(--warn-soft);border:1px solid rgba(242,181,68,.35)}
+.badge.fresh{color:var(--accent);background:var(--accent-soft);border:1px solid rgba(201,242,75,.3)}
+
+.kpi{padding:14px 16px}
+.kpi .v{font-size:clamp(24px,2.3vw,34px);font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-top:6px;white-space:nowrap}
+.kpi .v small{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:0;margin-left:4px}
+.kpi .v.none{font-size:18px;color:var(--dim);font-weight:700;letter-spacing:0;padding-top:8px}
+.kpi .f{font-size:11.5px;color:var(--muted);margin-top:4px}
+.kpi.ok .v{color:var(--accent)} .kpi.wa .v{color:var(--warn)} .kpi.bl .v{color:var(--crit)}
+.kpi.ok{border-color:rgba(201,242,75,.18)} .kpi.wa{border-color:rgba(242,181,68,.2)} .kpi.bl{border-color:rgba(255,93,93,.2)}
+.kpi .v.warn{color:var(--warn)}
+.bump{animation:bump .5s var(--spring)}
+@keyframes bump{35%{transform:scale(1.1)}}
+
+/* telemetry */
+.tele{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:18px;align-items:center}
+.chassis{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,150px) minmax(0,1fr);grid-template-rows:1fr 1fr;gap:14px 12px;align-items:center}
+.chassis svg{grid-column:2;grid-row:1/3;width:100%;height:auto;max-height:290px}
+.tyre{border:1px solid var(--line-2);border-radius:12px;padding:10px 12px}
+.tyre .t{font-size:24px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.tyre .t small{font-size:12px;color:var(--muted);font-weight:600}
+.tyre .s{font-size:11.5px;color:var(--muted)}
+.tyre.fl{grid-column:1;grid-row:1}.tyre.fr{grid-column:3;grid-row:1}.tyre.rl{grid-column:1;grid-row:2}.tyre.rr{grid-column:3;grid-row:2}
+[data-st="ok"]{--tc:var(--accent)}[data-st="hot"]{--tc:var(--warn)}[data-st="cold"]{--tc:var(--cold)}[data-st="none"]{--tc:var(--dim)}
+.tyre[data-st] .t,.engine[data-st] .t{color:var(--tc)}
+.tyre[data-st]{border-color:color-mix(in srgb,var(--tc) 35%,transparent)}
+.car-body{fill:rgba(236,239,227,.035);stroke:rgba(236,239,227,.5);stroke-width:1.4}
+.car-line{stroke:rgba(236,239,227,.32);stroke-width:1.2;fill:none}
+.wheel{transition:fill .5s;stroke:rgba(0,0,0,.5)}
+.engine{border:1px solid var(--line-2);border-radius:14px;padding:16px;text-align:left}
+.engine .t{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:6px;white-space:nowrap}
+.engine .t small{font-size:14px;color:var(--muted);font-weight:600}
+.engine[data-st]{border-color:color-mix(in srgb,var(--tc) 35%,transparent)}
+.stale-dim{opacity:.55;transition:opacity .4s}
+
+/* chart */
+.chartbox{position:relative;height:220px}
+.chartbox canvas{position:absolute;inset:0;width:100%;height:100%}
+.chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim);font-size:13px}
+
+/* table */
+.filters{display:flex;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+.filters button{background:none;border:0;padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-right:1px solid var(--line-2)}
+.filters button:last-child{border-right:0}
+.filters button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tablebox{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+th{font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.reason{white-space:normal;min-width:180px}
+tbody tr{cursor:pointer;transition:background .2s}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+tbody tr[aria-selected="true"]{background:rgba(201,242,75,.09);box-shadow:inset 3px 0 0 var(--accent)}
+tbody tr.new{animation:rowIn .6s var(--ease)}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}}
+.st{display:inline-flex;align-items:center;gap:7px}
+.st i{width:7px;height:7px;border-radius:50%}
+.st.Allow i{background:var(--accent)}.st.Alert i{background:var(--warn)}.st.Blocked i{background:var(--crit)}
+.claimed{color:var(--dim)}
+.claimed::after{content:" ?";color:var(--warn)}
+.undef{color:var(--dim);font-style:italic}
+.pager{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.pager .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.empty{color:var(--dim);font-size:13px;padding:18px 4px}
+
+/* detail */
+.detail{position:sticky;top:132px;max-height:calc(100vh - 150px);overflow-y:auto;scrollbar-width:thin}
+.status{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.status.Allow{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(201,242,75,.4)}
+.status.Alert{background:var(--warn-soft);color:var(--warn);border:1px solid rgba(242,181,68,.4)}
+.status.Blocked{background:var(--crit-soft);color:var(--crit);border:1px solid rgba(255,93,93,.4)}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);margin:0}
+.kv dt,.kv dd{padding:8px 0;border-bottom:1px solid var(--line);margin:0}
+.kv dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-top:10px}
+.kv dd{font-size:13.5px;overflow-wrap:anywhere}
+.ok-t{color:var(--accent)} .bad-t{color:var(--crit)} .warn-t{color:var(--warn)}
+.reasons{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.reasons code{font-family:var(--f-mono);font-size:11px;color:var(--dim);margin-left:6px}
+h3{font-size:15px;margin:18px 0 8px;font-weight:800}
+.acc{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.acc div{padding:10px 12px 10px 0;border-bottom:1px solid var(--line)}
+.acc div:nth-child(odd){border-right:1px solid var(--line)}
+.acc div:nth-child(even){padding-left:14px}
+.acc b{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em}
+pre{font-family:var(--f-mono);font-size:11.5px;line-height:1.55;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px;margin:0;white-space:pre}
+.note{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:12.5px;font-style:italic;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.follow{font-size:12px}
+
+@media (max-width:1200px){
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .detail{position:relative;top:0;max-height:none}
+}
+@media (max-width:760px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tele{grid-template-columns:minmax(0,1fr)}
+  .top{position:relative}
+}
+@media (max-width:520px){
+  .chassis{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto}
+  .chassis svg{grid-column:1/3;grid-row:1;max-height:200px}
+  .tyre.fl{grid-column:1;grid-row:2}.tyre.fr{grid-column:2;grid-row:2}.tyre.rl{grid-column:1;grid-row:3}.tyre.rr{grid-column:2;grid-row:3}
+  .kv{grid-template-columns:110px minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.aura i{opacity:1}}
+</style>
+</head>
+<body>
+<aside style="position:relative;z-index:2;max-width:1440px;margin:12px auto;padding:12px 16px;border:1px solid #434d2c;border-radius:12px;background:#171d12;font-size:13px">
+<strong>F1 CyberShield · мобильная демонстрация</strong>
+<div id="phoneRuntime" role="status">Подготовка Python…</div>
+<div style="color:#a7ac9e;margin:6px 0">Учебная симуляция. У каждого посетителя своя сессия. После обновления страницы данные сбросятся — скачайте журналы перед закрытием.</div>
+<button class="btn" type="button" data-export="accepted_messages.json">Скачать принятые сообщения</button>
+<button class="btn" type="button" data-export="security_log.txt">Скачать журнал угроз</button>
+</aside>
+<div class="aura" aria-hidden="true"><i class="a1"></i><i class="a2"></i></div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row">
+      <div class="logo">
+        <svg width="30" height="30" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M14 2.5 4 6.5v7c0 6 4.3 10.4 10 12 5.7-1.6 10-6 10-12v-7l-10-4Z" stroke="#C9F24B" stroke-width="1.6"/><path d="M8.5 15.5h5l1.5-4 2 6 1.2-2h1.3" stroke="#C9F24B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>F1 CyberShield<small>Учебная симуляция телеметрии</small></div>
+      </div>
+      <span class="pill sim">Симуляция</span>
+      <span class="spacer"></span>
+      <span class="lbl">Болид</span>
+      <div class="seg" id="seg" data-i="0" role="group" aria-label="Выбор болида">
+        <span class="ind"></span>
+        <button type="button" id="car0" aria-pressed="true">Болид 01</button>
+        <button type="button" id="car1" aria-pressed="false">Болид 02</button>
+      </div>
+      <div class="clock"><span class="lbl">Время сессии</span><b class="num" id="sessT">00:00:00</b></div>
+    </div>
+    <div class="row">
+      <span class="pill" id="stPill"><span class="dot" id="stDot"></span><span id="stText">Сессия не начата</span></span>
+      <button class="btn primary" id="bStart" type="button">Начать симуляцию</button>
+      <button class="btn" id="bPause" type="button">Пауза</button>
+      <button class="btn" id="bResume" type="button">Продолжить</button>
+      <button class="btn danger" id="bStop" type="button">Завершить сессию</button>
+      <span class="sep"></span>
+      <label class="lbl" for="scen">Тестовый пакет</label>
+      <select class="select" id="scen"></select>
+      <button class="btn" id="bSend" type="button">Отправить</button>
+      <label class="check"><input type="checkbox" id="incid"> Случайные инциденты</label>
+      <span class="toast" id="toast" role="status"></span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="kpis" aria-label="Показатели">
+    <div class="card kpi"><div class="lbl">Текущая скорость</div><div class="v num" id="kNow"></div><div class="f" id="kNowF">выбранный болид</div></div>
+    <div class="card kpi"><div class="lbl">Максимальная</div><div class="v num" id="kMax"></div><div class="f">за сессию</div></div>
+    <div class="card kpi"><div class="lbl">Средняя за сессию</div><div class="v num" id="kAvg"></div><div class="f" id="kAvgF" title="Интеграл скорости по времени получения пакетов, делённый на учтённое время. Интервалы больше 3 с и паузы не учитываются.">по времени получения</div></div>
+    <div class="card kpi ok"><div class="lbl">Без предупреждений</div><div class="v num" id="nAllow">0</div><div class="f">оба болида</div></div>
+    <div class="card kpi wa"><div class="lbl">Предупреждения</div><div class="v num" id="nAlert">0</div><div class="f">приняты с пометкой</div></div>
+    <div class="card kpi bl"><div class="lbl">Заблокировано</div><div class="v num" id="nBlk">0</div><div class="f">не попали в телеметрию</div></div>
+  </section>
+
+  <div class="main">
+    <div class="left">
+      <section class="card" style="animation-delay:.05s">
+        <div class="card-h">
+          <h2>Телеметрия</h2>
+          <span class="muted r" id="lastRx">Последние принятые данные: —</span>
+          <span class="badge" id="fresh" hidden></span>
+        </div>
+        <div class="tele" id="teleBox">
+          <div class="chassis">
+            <div class="tyre fl" id="tFL" data-st="none"><div class="lbl">Передняя левая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <div class="tyre fr" id="tFR" data-st="none"><div class="lbl">Передняя правая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <svg viewBox="0 0 200 360" role="img" aria-label="Схема болида, вид сверху">
+              <rect x="26" y="18" width="148" height="14" rx="4" class="car-body"/>
+              <path d="M93 32 L107 32 L113 118 L87 118 Z" class="car-body"/>
+              <path d="M58 92 L86 100 M142 92 L114 100 M58 112 L87 112 M142 112 L113 112" class="car-line"/>
+              <path d="M87 118 C70 136 60 168 62 198 L66 262 C70 286 86 300 100 302 C114 300 130 286 134 262 L138 198 C140 168 130 136 113 118 Z" class="car-body"/>
+              <path d="M74 150 C70 176 70 210 74 240 M126 150 C130 176 130 210 126 240" class="car-line"/>
+              <ellipse cx="100" cy="168" rx="12" ry="22" class="car-body"/>
+              <path d="M84 158 C88 140 112 140 116 158" class="car-line" stroke-width="2.4"/>
+              <path d="M56 270 L70 262 M144 270 L130 262 M56 292 L74 286 M144 292 L126 286" class="car-line"/>
+              <rect x="46" y="318" width="108" height="20" rx="4" class="car-body"/>
+              <rect x="24" y="74" width="32" height="54" rx="8" class="wheel" id="wFL" fill="#3a3f35"/>
+              <rect x="144" y="74" width="32" height="54" rx="8" class="wheel" id="wFR" fill="#3a3f35"/>
+              <rect x="18" y="250" width="38" height="62" rx="9" class="wheel" id="wRL" fill="#3a3f35"/>
+              <rect x="144" y="250" width="38" height="62" rx="9" class="wheel" id="wRR" fill="#3a3f35"/>
+            </svg>
+            <div class="tyre rl" id="tRL" data-st="none"><div class="lbl">Задняя левая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <div class="tyre rr" id="tRR" data-st="none"><div class="lbl">Задняя правая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+          </div>
+          <div class="engine" id="eng" data-st="none">
+            <div class="lbl">Температура двигателя</div>
+            <div class="muted" style="font-size:12px">охлаждающая жидкость</div>
+            <div class="t num" id="engT">—</div>
+            <div class="muted" style="font-size:12px" id="engS">нет данных</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="animation-delay:.1s">
+        <div class="card-h"><h2>Скорость</h2><span class="muted">последние 60 секунд, только принятые пакеты</span></div>
+        <div class="chartbox"><canvas id="chart" role="img" aria-label="График скорости за последние 60 секунд"></canvas><div class="chart-empty" id="chartEmpty">Нет данных</div></div>
+      </section>
+
+      <section class="card" style="animation-delay:.15s">
+        <div class="card-h">
+          <h2>Журнал сообщений</h2>
+          <div class="filters r" role="group" aria-label="Фильтр журнала">
+            <button type="button" data-f="all" aria-pressed="true">Все</button>
+            <button type="button" data-f="accepted" aria-pressed="false">Принятые</button>
+            <button type="button" data-f="alert" aria-pressed="false">Предупреждения</button>
+            <button type="button" data-f="blocked" aria-pressed="false">Блокировки</button>
+          </div>
+        </div>
+        <div class="tablebox">
+          <table>
+            <thead><tr><th>Время ▾</th><th>Болид</th><th>Источник</th><th>№</th><th>Статус</th><th>Причина</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="rowsEmpty">Пока нет сообщений. Нажмите «Начать симуляцию».</div>
+        <div class="pager">
+          <span id="pgInfo">Показано 0 из 0</span>
+          <span class="muted" id="pgLimit"></span>
+          <div class="r">
+            <button class="btn" id="pgPrev" type="button">‹ Назад</button>
+            <span class="num" id="pgNum">1</span>
+            <button class="btn" id="pgNext" type="button">Далее ›</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="card detail" id="detail" style="animation-delay:.08s" aria-live="polite">
+      <div class="card-h"><h2>Детали сообщения</h2><span class="r" id="dStatus"></span></div>
+      <div id="dBody"><div class="empty">Выберите строку в журнале, чтобы увидеть подробности.</div></div>
+      <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 4.6v.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Заблокированные пакеты не обновляют показатели, график, максимальную и среднюю скорость.</div>
+    </aside>
+  </div>
+</main>
+
+<script type="module">
+import { loadPyodide } from 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.mjs';
+const status = document.getElementById('phoneRuntime');
+let python, call, tick;
+window.shieldReady = (async () => {
+  status.textContent = 'Загрузка Python… При первом открытии это может занять немного времени.';
+  python = await loadPyodide({indexURL: 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/'});
+  const sources = {"main.py": "from authentication import create_signature, verify_signature\nfrom datetime import datetime\nimport json \nimport math\nfrom simulator import generate_message\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\nallowed_sources = {\"car_sensor_01\", \"car_sensor_02\", \"car_sensor_03\"}\nallowed_car_sources = {\n    \"car_01\": {\"car_sensor_01\"},\n    \"car_02\": {\"car_sensor_02\"}\n}\nseen_packets = set()\ndef write_security_log(message, result, status):\n    if status == \"Allow\":\n        return\n\n    source = message.get(\"source\", \"UNKNOWN\")\n    speed = message.get(\"speed\", \"UNKNOWN\")\n    timestamp = datetime.now().strftime(\"%H:%M\")\n\n    with open(\"security_log.txt\", \"a\", encoding=\"utf-8\") as file:\n        file.write(f\"{source}:{result}:{speed}:{timestamp}:{status}\\n\")\ndef check_message(message): \n    if \"speed\" not in message:\n        return \"Missing Speed\"\n    elif \"source\" not in message:\n        return \"Missing Source\"\n    elif \"engine_temperature\" not in message:\n        return \"Missing engine temperature\"\n    elif \"tyre_temperatures\" not in message:\n        return \"Missing tyre temperatures\"\n    elif not isinstance(message[\"source\"], str):\n        return \"Invalid source type\"\n    elif message[\"source\"] not in allowed_sources:\n        return \"Unknown source\"\n    car_id = message.get(\"car_id\")\n\n    if not isinstance(car_id, str):\n        return \"Missing or invalid car_id\"\n\n    if car_id not in allowed_car_sources:\n        return \"Unknown car\"\n\n    if message[\"source\"] not in allowed_car_sources[car_id]:\n        return \"Source does not match car\"\n    speed = message[\"speed\"]\n    temperature_result = check_engine_temperature(message[\"engine_temperature\"])\n\n   \n            \n\n    if type(speed) not in (int, float):\n        return \"Invalid data type\"\n    if temperature_result == \"Invalid data type\":\n        return \"Invalid temperature data type\"\n    \n\n    \n    if speed < 0:\n        return \"Invalid speed\"\n\n    tyre_result = check_tyre_temperatures(message[\"tyre_temperatures\"])\n\n    if not isinstance(tyre_result, list):\n        return tyre_result\n\n    warnings = get_warnings(speed, message[\"engine_temperature\"])\n    warnings.extend(tyre_result)\n\n    return warnings\ndef check_signed_message(message, signature, secret_key):\n    if not isinstance(signature, str):\n        return \"Invalid signature type\"\n\n    if not verify_signature(message, signature, secret_key):\n        return \"Authentication failed\"\n    \n    sequence = message.get(\"sequence\")\n\n    if type(sequence) is not int or sequence < 1:\n        return \"Invalid sequence\"\n    \n    result = check_message(message)\n\n    if not isinstance(result, list):\n        return result \n\n    packet_id = (message[\"source\"], sequence)\n\n    if packet_id in seen_packets: \n        return \"Replay detected\"\n\n    seen_packets.add(packet_id)\n    return result \n\ndef check_engine_temperature(temperature):\n    if type(temperature) not in (int, float):\n        return \"Invalid data type\"\n    elif temperature < 0:\n        return \"Low engine temperature\"\n    elif temperature > 110:\n        return \"High engine temperature\"\n    else:\n        return \"Normal engine temperature\"\n\ndef check_tyre_temperatures(tyre_temperatures):\n    if not isinstance(tyre_temperatures, dict):\n        return \"Invalid tyre data format\"\n   \n    required_wheels = (\n        \"front_left\",\n        \"front_right\",\n        \"rear_left\",\n        \"rear_right\"\n    )\n    warnings = []\n\n    for wheel in required_wheels:\n        if wheel not in tyre_temperatures:\n            return f\"Missing tyre temperature:{wheel}\"\n\n        temperature = tyre_temperatures[wheel]\n\n        if type(temperature) not in (int, float):\n            return f\"Invalid tyre temperature type: {wheel}\"\n\n        if isinstance(temperature, float) and not math.isfinite(temperature):\n                    return f\"Non-finite tyre temperature: {wheel}\"\n        \n        if temperature < 70:\n                    warnings.append(f\"Low tyre temperature: {wheel}\")\n        elif temperature > 110:\n                    warnings.append(f\"High tyre temperature: {wheel}\")\n        \n\n    return warnings \n\ndef get_warnings(speed, engine_temperature):\n    warnings = []\n    if speed > 300:\n        warnings.append(\"Unusual speed\")\n    if engine_temperature > 110:\n        warnings.append(\"High engine temperature\")\n    if engine_temperature < 0:\n        warnings.append(\"Low engine temperature\")\n    \n    return warnings\n\ndef get_status(result):\n    if isinstance(result, list):\n        if result: \n            return  \"Alert\"\n        else: \n            return \"Allow\"\n    \n    return \"Blocked\" \n\ndef process_packet(packet, secret_key):\n    if not isinstance(packet, dict):\n        return {\n            \"message\": {},\n            \"result\": \"Invalid packet format\",\n            \"status\": \"Blocked\"\n        }\n    if \"message\" not in packet:\n        return {\n            \"message\": {}, \n            \"result\": \"Missing message\", \n            \"status\": \"Blocked\"\n        }\n    if not isinstance(packet[\"message\"], dict):\n     return {\n           \"message\": {}, \n            \"result\": \"Invalid message format\",\n            \"status\": \"Blocked\"\n            }\n    if \"signature\" not in packet:\n        return {\n            \"message\": packet[\"message\"],\n            \"result\": \"Missing signature\",\n            \"status\": \"Blocked\"\n        }\n    message = packet[\"message\"]\n    signature = packet[\"signature\"]\n\n    result = check_signed_message(message, signature, secret_key)\n\n    return {\n        \"message\": message, \n        \"result\": result, \n        \"status\": get_status(result)\n    }\n\ndef run_server():\n    class Handler(BaseHTTPRequestHandler):\n        def do_POST(self):\n            if self.path != \"/telemetry\":\n                self.send_error(404, \"Unknown endpoint\")\n                return\n\n            try:\n                length = int(self.headers.get(\"Content-Length\", \"0\"))\n            except ValueError:\n                self.send_error(400, \"Invalid Content-Length\")\n                return\n\n            if not 1 <= length <= 65536:\n                self.send_error(400, \"Invalid request size\")\n                return\n\n            try:\n                raw_data = self.rfile.read(length)\n                packet = json.loads(raw_data.decode(\"utf-8\"))\n            except (UnicodeDecodeError, ValueError):\n                write_security_log({}, \"Invalid JSON\", \"Blocked\")\n                self.send_error(400, \"Invalid JSON\")\n                return\n\n            response = process_packet(packet, b\"training-key\")\n\n            write_security_log(\n                response[\"message\"],\n                response[\"result\"],\n                response[\"status\"]\n            )\n\n            print(response[\"status\"], response[\"result\"])\n\n            body = json.dumps(response).encode(\"utf-8\")\n\n            self.send_response(200)\n            self.send_header(\"Content-Type\", \"application/json\")\n            self.send_header(\"Content-Length\", str(len(body)))\n            self.end_headers()\n            self.wfile.write(body)\n    with HTTPServer((\"127.0.0.1\", 8000), Handler) as server:\n        print(\"CyberShield запущен: http://127.0.0.1:8000\")\n        try:\n            server.serve_forever()\n        except KeyboardInterrupt:\n            print(\"\\nСервер остановлен\")\n\nif __name__ == \"__main__\":\n    car_01_message = generate_message(1, \"car_01\", \"car_sensor_01\")\n    car_02_message = generate_message(1, \"car_02\", \"car_sensor_02\")\n\n    print(\"Болид 1:\", car_01_message)\n    print(\"Болид 2:\", car_02_message)\n    \n    assert get_warnings(250, 95) == []\n    assert get_warnings(315, 120) == [\"Unusual speed\", \"High engine temperature\"]\n\n    normal_tyres = {\n        \"front_left\": 94,\n        \"front_right\": 96,\n        \"rear_left\": 98,\n        \"rear_right\": 97\n    }\n\n    \n\n    messages = [\n        {\"source\": \"car_sensor_01\", \"speed\":\"hello\", \"engine_temperature\":100, \"tyre_temperatures\": normal_tyres.copy()\n        }, \n        {\"source\":\"car_sensor_02\", \"speed\":315, \"engine_temperature\":95,\"tyre_temperatures\": normal_tyres.copy()\n        }, \n        {\"source\": \"car_sensor_03\", \"speed\":280, \"engine_temperature\":110,\"tyre_temperatures\": normal_tyres.copy()},\n        {\"source\": \"car_sensor_04\"}, \n        {\"source\": \"car_sensor_05\", \"speed\":-20,\"tyre_temperatures\": normal_tyres.copy()}, \n        { \"speed\":260}, \n        {\"source\": \"fake_sensor\", \"speed\":250, \"engine_temperature\":105,\"tyre_temperatures\": normal_tyres.copy()}, \n        {\"source\": \"car_sensor_01\", \"speed\":250, \"engine_temperature\":90,\"tyre_temperatures\": normal_tyres.copy()},\n        {\"source\": \"car_sensor_01\",\"speed\":250, \"engine_temperature\":95,\"tyre_temperatures\": normal_tyres.copy()},\n        {\"source\": \"car_sensor_02\", \"speed\":270, \"engine_temperature\":120,\"tyre_temperatures\": normal_tyres.copy()},\n        {\"source\": \"car_sensor_02\", \"speed\": \"hello\", \"engine_temperature\": 120,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_03\", \"speed\": 250, \"engine_temperature\": 120,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_01\", \"speed\": 315, \"engine_temperature\": \"hello\",\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_02\", \"speed\": 315, \"engine_temperature\": \"hello\",\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_01\", \"speed\":250, \"engine_temperature\":95,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_03\", \"speed\":250, \"engine_temperature\":120,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_02\", \"speed\":250, \"engine_temperature\":-10,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_03\", \"speed\":315, \"engine_temperature\":\"Hello\",\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\":\"car_sensor_01\", \"speed\":250,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": \"car_sensor_01\", \"speed\": 315, \"engine_temperature\": 120,\"tyre_temperatures\": normal_tyres.copy()},\n    {\"source\": [\"car_sensor_01\"], \"speed\": 250, \"engine_temperature\": 95,\"tyre_temperatures\": normal_tyres.copy()},\n    {\n    \"source\": \"car_sensor_01\",\n    \"speed\": 250,\n    \"engine_temperature\": 95,\n    \"tyre_temperatures\": {\n        \"front_left\": 94,\n        \"front_right\": 96,\n        \"rear_left\": 98,\n        \"rear_right\": 97\n    }\n},\n    ]\n    allowed_messages = []\n\n\n    simulation_key = b\"training-key\"\n\n    signed_packets = []\n\n    for sequence, outgoing_message in enumerate(messages, start=1):\n        message_to_sign = outgoing_message.copy()\n        message_to_sign[\"sequence\"] = sequence \n\n        packet = {\n            \"message\": message_to_sign, \n            \"signature\": create_signature(message_to_sign, simulation_key)\n        } \n        signed_packets.append(packet)\n\n\n    #signed_packets[-1][\"message\"][\"speed\"] = 100\n    signed_packets.append(signed_packets[2].copy())\n    signed_packets.append({\"message\": \"hello\"})\n\n    for packet in signed_packets:\n        response = process_packet(packet, simulation_key)\n        message = response[\"message\"]\n        result = response[\"result\"]\n        status = response[\"status\"]\n        speed = message.get(\"speed\", \"UNKNOWN\")\n\n        if status == \"Allow\" or status == \"Alert\":\n            record = {\n                \"message\": message,\n                \"status\": status,\n                \"warnings\": result\n            }\n            allowed_messages.append(record)\n\n        source = message.get(\"source\", \"UNKNOWN\")\n        timestamp = datetime.now().strftime(\"%H:%M\")\n        print(source, result, speed, timestamp, status)\n        write_security_log(message, result, status)\n        \n    print(\"Allowed messages:\", allowed_messages)\n\n    with open(\"accepted_messages.json\", \"w\", encoding=\"utf-8\") as file:\n        json.dump(allowed_messages, file, indent=4)\n\n    test_key = b\"training-key\"\n\n    test_message = {\n        \"source\": \"car_sensor_01\", \n        \"speed\": 250, \n        \"engine_temperature\": 95\n    }\n\n    test_signature = create_signature(test_message, test_key)\n\n    test_result = check_signed_message(test_message, test_signature, test_key)\n\n    test_status = get_status(test_result)\n    print(\"HMAC test:\", test_result, test_status)\n    write_security_log(test_message, test_result, test_status)", "authentication.py": "import hmac\nimport hashlib\nimport json \n\ndef create_signature(message, secret_key):\n    return hmac.new(\n    secret_key,\n    json.dumps(message, sort_keys=True).encode(\"utf-8\"),\n    hashlib.sha256\n).hexdigest()\n\ndef verify_signature(message, received_signature, secret_key):\n    if not isinstance(received_signature, str):\n        return False\n\n    if len(received_signature) != 64:\n        return False\n\n    if any(char not in \"0123456789abcdef\" for char in received_signature):\n        return False\n\n    expected_signature = create_signature(message, secret_key)\n    return hmac.compare_digest(received_signature, expected_signature)", "simulator.py": "import random \n\ndef generate_message(sequence, car_id, source):\n    return {\n        \"car_id\": car_id,\n        \"source\": source,\n        \"sequence\":sequence,\n        \"speed\": round(random.uniform(200, 300), 1),\n        \"engine_temperature\": round(random.uniform(90, 105), 1),\n        \"tyre_temperatures\": {\n            \"front_left\": round(random.uniform(85, 105), 1),\n            \"front_right\": round(random.uniform(85, 105), 1),\n            \"rear_left\": round(random.uniform(85, 105), 1),\n            \"rear_right\": round(random.uniform(85, 105), 1)\n        }\n    }\nif __name__ == \"__main__\":\n    import json\n    import time\n    from pathlib import Path\n\n    from authentication import create_signature\n    from urllib.request import Request, urlopen\n\n    simulation_key = b\"training-key\"\n    accepted_messages = []\n\n    cars = (\n        (\"car_01\", \"car_sensor_01\"),\n        (\"car_02\", \"car_sensor_02\")\n    )\n\n    for sequence in range(1, 11):\n        for car_id, source in cars:\n            message = generate_message(sequence, car_id, source)\n\n            packet = {\n                \"message\": message,\n                \"signature\": create_signature(message, simulation_key)\n            }\n\n            request = Request(\n                \"http://127.0.0.1:8000/telemetry\",\n                data=json.dumps(packet).encode(\"utf-8\"),\n                headers={\"Content-Type\": \"application/json\"},\n                method=\"POST\"\n            )\n\n            with urlopen(request, timeout=5) as http_response:\n                response = json.loads(\n                    http_response.read().decode(\"utf-8\")\n                )\n            status = response[\"status\"]\n\n            print(\n                car_id,\n                \"№\", sequence,\n                \"скорость:\", message[\"speed\"],\n                \"двигатель:\", message[\"engine_temperature\"],\n                status,\n                response[\"result\"]\n            )\n\n            \n\n            if status in (\"Allow\", \"Alert\"):\n                accepted_messages.append({\n                    \"message\": message,\n                    \"status\": status,\n                    \"warnings\": response[\"result\"]\n                })\n\n        if sequence < 10:\n            time.sleep(1)\n\n    output_path = Path(__file__).with_name(\"accepted_messages.json\")\n\n    with output_path.open(\"w\", encoding=\"utf-8\") as file:\n        json.dump(accepted_messages, file, indent=4)\n\n    print(\"Симуляция завершена. Принято:\", len(accepted_messages))", "dashboard.py": "\"\"\"F1 CyberShield: веб-интерфейс учебной симуляции телеметрии.\n\nЗапуск:  python dashboard.py      (на Windows: py dashboard.py)\nЗатем откройте в браузере:  http://127.0.0.1:8050\n\nЦепочка для каждого пакета:\n    генерация (simulator.generate_message) -> номер пакета -> HMAC\n    (authentication.create_signature) -> main.process_packet -> сохранение\n    результата -> отображение на странице.\n\nprocess_packet вызывается ровно один раз на пакет. Страница только читает\nсохранённые результаты, поэтому перерисовка, фильтры и просмотр деталей\nне могут случайно сработать как \"повтор пакета\".\n\nЭто учебная симуляция, а не подключение к настоящему болиду.\n\"\"\"\n\nimport copy\nimport json\nimport os\nimport random\nimport threading\nimport time\nfrom collections import deque\nfrom datetime import datetime\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nfrom pathlib import Path\nfrom urllib.parse import parse_qs, urlparse\n\nimport main as core\nfrom authentication import create_signature\nfrom simulator import generate_message\n\nHERE = Path(__file__).resolve().parent\nHOST = \"127.0.0.1\"\nPORT = 8050\n\nSECRET_KEY = b\"training-key\"  # учебный ключ, тот же, что в main.py и simulator.py\nCARS = ((\"car_01\", \"car_sensor_01\"), (\"car_02\", \"car_sensor_02\"))\nTICK_SECONDS = 0.5      # как часто каждый болид присылает пакет\nHISTORY_LIMIT = 1000    # сколько последних событий хранится для таблицы\nCHART_WINDOW_S = 60     # окно графика скорости\nSTALE_AFTER_S = 3.0     # через сколько секунд без данных показания считаются устаревшими\nGAP_LIMIT_S = 3.0       # интервал больше этого не участвует в средней скорости\nINCIDENT_CHANCE = 0.06  # вероятность тестового инцидента на пакет, если включены\n\n# Сценарии генератора. Они описывают, КАК пакет был создан для проверки щита.\n# Решение о пакете всегда принимает только main.process_packet.\nSCENARIOS = {\n    \"normal\": \"Обычный пакет\",\n    \"alert\": \"Значение за учебным порогом (подписано честно)\",\n    \"tamper\": \"Подмена: скорость изменена после подписи\",\n    \"replay\": \"Повтор: отправлен уже принятый пакет\",\n    \"malformed\": \"Неправильный формат пакета\",\n    \"unknown_source\": \"Чужой датчик (подписан, но не зарегистрирован)\",\n}\nINCIDENT_SCENARIOS = (\"alert\", \"tamper\", \"replay\", \"malformed\", \"unknown_source\")\n\n# Результаты, при которых process_packet отклонил пакет ДО проверки HMAC.\nHMAC_NOT_CHECKED = {\n    \"Invalid packet format\",\n    \"Missing message\",\n    \"Invalid message format\",\n    \"Missing signature\",\n    \"Invalid signature type\",\n}\n\nREASONS_RU = {\n    \"Invalid packet format\": \"Неверный формат пакета\",\n    \"Missing message\": \"В пакете нет сообщения\",\n    \"Invalid message format\": \"Неверный формат сообщения\",\n    \"Missing signature\": \"Нет подписи\",\n    \"Invalid signature type\": \"Неверный тип подписи\",\n    \"Authentication failed\": \"Подпись не совпадает (HMAC)\",\n    \"Invalid sequence\": \"Неверный номер пакета\",\n    \"Replay detected\": \"Повтор пакета\",\n    \"Missing Speed\": \"Нет скорости\",\n    \"Missing Source\": \"Нет источника\",\n    \"Missing engine temperature\": \"Нет температуры двигателя\",\n    \"Missing tyre temperatures\": \"Нет температур шин\",\n    \"Invalid source type\": \"Неверный тип источника\",\n    \"Unknown source\": \"Неизвестный источник\",\n    \"Missing or invalid car_id\": \"Нет или неверный car_id\",\n    \"Unknown car\": \"Неизвестный болид\",\n    \"Source does not match car\": \"Источник не принадлежит болиду\",\n    \"Invalid data type\": \"Неверный тип данных скорости\",\n    \"Invalid temperature data type\": \"Неверный тип температуры двигателя\",\n    \"Invalid speed\": \"Отрицательная скорость\",\n    \"Invalid tyre data format\": \"Неверный формат температур шин\",\n    \"Unusual speed\": \"Необычно высокая скорость\",\n    \"High engine temperature\": \"Высокая температура двигателя\",\n    \"Low engine temperature\": \"Низкая температура двигателя\",\n}\nWHEELS_RU = {\n    \"front_left\": \"передняя левая\",\n    \"front_right\": \"передняя правая\",\n    \"rear_left\": \"задняя левая\",\n    \"rear_right\": \"задняя правая\",\n}\nWHEEL_PREFIXES_RU = (\n    (\"Missing tyre temperature:\", \"Нет температуры шины\"),\n    (\"Invalid tyre temperature type:\", \"Неверный тип температуры шины\"),\n    (\"Non-finite tyre temperature:\", \"Недопустимое значение температуры шины\"),\n    (\"Low tyre temperature:\", \"Низкая температура шины\"),\n    (\"High tyre temperature:\", \"Высокая температура шины\"),\n)\n\n\ndef reason_ru(code):\n    \"\"\"Переводит строку результата ядра на русский. Исходный код тоже сохраняется.\"\"\"\n    if code in REASONS_RU:\n        return REASONS_RU[code]\n    for prefix, text in WHEEL_PREFIXES_RU:\n        if code.startswith(prefix):\n            wheel = code[len(prefix):].strip()\n            return f\"{text}: {WHEELS_RU.get(wheel, wheel)}\"\n    return code\n\n\ndef hmac_state(result):\n    \"\"\"Что известно о проверке HMAC по результату process_packet.\n\n    check_signed_message проверяет подпись первой, до номера, полей и повтора.\n    Поэтому любой результат, кроме ранних ошибок формата и Authentication failed,\n    означает, что подпись проверена и совпала.\n    \"\"\"\n    if isinstance(result, list):\n        return \"passed\"\n    if result == \"Authentication failed\":\n        return \"failed\"\n    if result in HMAC_NOT_CHECKED:\n        return \"not_checked\"\n    return \"passed\"\n\n\ndef _claimed(message, key):\n    \"\"\"Значение из непроверенного пакета: только если это строка или целое число.\"\"\"\n    if not isinstance(message, dict):\n        return None\n    value = message.get(key)\n    if isinstance(value, str) or (type(value) is int):\n        return value\n    return None\n\n\nclass CarStats:\n    \"\"\"Принятая телеметрия одного болида. Сюда попадают только Allow и Alert.\"\"\"\n\n    def __init__(self):\n        self.samples = deque(maxlen=600)  # (время, скорость) для графика\n        self.last = None                  # последнее принятое сообщение\n        self.max_speed = None\n        self.area = 0.0                   # интеграл скорости по времени\n        self.time = 0.0                   # время, учтённое в средней\n        self.prev = None                  # предыдущая точка для средней\n\n    def add(self, received, message, warnings):\n        speed = float(message[\"speed\"])\n        self.samples.append((received, speed))\n        self.max_speed = speed if self.max_speed is None else max(self.max_speed, speed)\n        if self.prev is not None:\n            dt = received - self.prev[0]\n            if 0 < dt <= GAP_LIMIT_S:\n                self.area += (speed + self.prev[1]) / 2 * dt\n                self.time += dt\n        self.prev = (received, speed)\n        self.last = {\n            \"received\": received,\n            \"speed\": speed,\n            \"engine_temperature\": float(message[\"engine_temperature\"]),\n            \"tyres\": {w: float(message[\"tyre_temperatures\"][w]) for w in WHEELS_RU},\n            \"warnings\": list(warnings),\n            \"sequence\": message[\"sequence\"],\n        }\n\n    def break_interval(self):\n        \"\"\"Пауза или остановка: следующий интервал не склеивается с предыдущим.\"\"\"\n        self.prev = None\n\n    def average(self):\n        return self.area / self.time if self.time > 0 else None\n\n\nclass ShieldSession:\n    \"\"\"Сессия симуляции: генерирует пакеты, отдаёт их ядру и хранит результаты.\"\"\"\n\n    def __init__(self, key=SECRET_KEY, data_dir=HERE, write_files=True, rng=None, run_thread=True):\n        self.key = key\n        self.run_thread = run_thread  # False: пакеты отправляются только вручную (для тестов)\n        self.data_dir = Path(data_dir)\n        self.write_files = write_files\n        self.rng = rng or random.Random()\n        self.lock = threading.RLock()\n        self.state = \"idle\"  # idle | running | paused | ended\n        self.incidents = False\n        self.version = 0\n        self._thread = None\n        self._stop = threading.Event()\n        self._dirty = False\n        self._last_save = 0.0\n        self._reset()\n\n    # ---------- сессия ----------\n    def _reset(self):\n        self.events = deque(maxlen=HISTORY_LIMIT)\n        self.next_id = 1\n        self.counters = {\"Allow\": 0, \"Alert\": 0, \"Blocked\": 0}\n        self.cars = {car_id: CarStats() for car_id, _ in CARS}\n        self.accepted_records = []\n        self.replayable = {car_id: deque(maxlen=30) for car_id, _ in CARS}\n        self.seq = {source: self._next_free_sequence(source) for _, source in CARS}\n        self.run_time = 0.0\n        self.run_since = None\n        self.frozen_at = None\n        self.started_at = None\n        self.version += 1\n\n    @staticmethod\n    def _next_free_sequence(source):\n        \"\"\"Новая сессия продолжает нумерацию после самого большого принятого номера.\n\n        Память о повторах (main.seen_packets) при этом не очищается, поэтому\n        старые пакеты по-прежнему будут блокироваться как повтор.\n        \"\"\"\n        used = [seq for (src, seq) in core.seen_packets if src == source]\n        return max(used, default=0) + 1\n\n    def control(self, action):\n        with self.lock:\n            now = time.time()\n            if action == \"start\" and self.state in (\"idle\", \"ended\"):\n                self._reset()\n                self.state = \"running\"\n                self.started_at = now\n                self.run_since = now\n                self._ensure_thread()\n            elif action == \"pause\" and self.state == \"running\":\n                self.state = \"paused\"\n                self.run_time += now - self.run_since\n                self.run_since = None\n                self.frozen_at = now\n                for car in self.cars.values():\n                    car.break_interval()\n                self._save(force=True)\n            elif action == \"resume\" and self.state == \"paused\":\n                self.state = \"running\"\n                self.run_since = now\n                self.frozen_at = None\n            elif action == \"stop\" and self.state in (\"running\", \"paused\"):\n                if self.run_since is not None:\n                    self.run_time += now - self.run_since\n                self.run_since = None\n                self.state = \"ended\"\n                self.frozen_at = now\n                for car in self.cars.values():\n                    car.break_interval()\n                self._save(force=True)\n            else:\n                return False\n            self.version += 1\n            return True\n\n    def set_incidents(self, enabled):\n        with self.lock:\n            self.incidents = bool(enabled)\n            self.version += 1\n\n    def _ensure_thread(self):\n        if not self.run_thread:\n            return\n        if self._thread is None or not self._thread.is_alive():\n            self._stop.clear()\n            self._thread = threading.Thread(target=self._loop, name=\"simulation\", daemon=True)\n            self._thread.start()\n\n    def shutdown(self):\n        self._stop.set()\n        with self.lock:\n            self._save(force=True)\n\n    def _loop(self):\n        \"\"\"Рабочий поток: страница не ждёт генерацию, она только читает результаты.\"\"\"\n        while not self._stop.is_set():\n            with self.lock:\n                if self.state == \"running\":\n                    for car_id, _ in CARS:\n                        scenario = \"normal\"\n                        if self.incidents and self.rng.random() < INCIDENT_CHANCE:\n                            scenario = self.rng.choice(INCIDENT_SCENARIOS)\n                        self.send_scenario(scenario, car_id)\n                    self._save()\n            self._stop.wait(TICK_SECONDS)\n\n    # ---------- генерация пакетов ----------\n    def _take_sequence(self, source):\n        seq = self.seq[source]\n        self.seq[source] += 1\n        return seq\n\n    def build_packet(self, scenario, car_id):\n        \"\"\"Создаёт пакет для сценария. Возвращает None, если сценарий сейчас невозможен.\"\"\"\n        source = dict(CARS)[car_id]\n        if scenario == \"replay\":\n            if not self.replayable[car_id]:\n                return None\n            return copy.deepcopy(self.rng.choice(list(self.replayable[car_id])))\n        if scenario == \"malformed\":\n            if self.rng.random() < 0.5:\n                return {\"message\": \"hello\"}\n            message = generate_message(self._take_sequence(source), car_id, source)\n            return {\"message\": message}  # подписи нет\n        if scenario == \"unknown_source\":\n            message = generate_message(1, car_id, \"car_sensor_09\")\n            return {\"message\": message, \"signature\": create_signature(message, self.key)}\n\n        message = generate_message(self._take_sequence(source), car_id, source)\n        if scenario == \"alert\":\n            kind = self.rng.choice((\"engine\", \"tyre\", \"speed\"))\n            if kind == \"engine\":\n                message[\"engine_temperature\"] = round(self.rng.uniform(111, 118), 1)\n            elif kind == \"tyre\":\n                wheel = self.rng.choice(tuple(WHEELS_RU))\n                message[\"tyre_temperatures\"][wheel] = round(self.rng.uniform(111, 119), 1)\n            else:\n                message[\"speed\"] = round(self.rng.uniform(305, 335), 1)\n        packet = {\"message\": message, \"signature\": create_signature(message, self.key)}\n        if scenario == \"tamper\":\n            packet[\"message\"][\"speed\"] = round(packet[\"message\"][\"speed\"] + 40, 1)\n        return packet\n\n    def send_scenario(self, scenario, car_id):\n        with self.lock:\n            if scenario not in SCENARIOS or car_id not in dict(CARS):\n                return None\n            packet = self.build_packet(scenario, car_id)\n            if packet is None:\n                return None\n            return self.handle_packet(packet, scenario)\n\n    # ---------- единственная точка вызова ядра ----------\n    def handle_packet(self, packet, scenario=None, received=None):\n        with self.lock:\n            received = time.time() if received is None else received\n            raw = copy.deepcopy(packet)\n            try:\n                response = core.process_packet(packet, self.key)\n            except Exception as error:  # ядро не должно падать, но поток интерфейса важнее\n                response = {\"message\": {}, \"result\": f\"Core error: {type(error).__name__}\", \"status\": \"Blocked\"}\n            status, result, message = response[\"status\"], response[\"result\"], response[\"message\"]\n            if self.write_files:\n                core.write_security_log(message, result, status)\n\n            accepted = status in (\"Allow\", \"Alert\")\n            reasons = result if isinstance(result, list) else [result]\n            record = {\n                \"id\": self.next_id,\n                \"received\": received,\n                \"status\": status,\n                \"result\": result,\n                \"reasons\": [{\"code\": r, \"text\": reason_ru(r)} for r in reasons],\n                \"hmac\": hmac_state(result),\n                \"accepted\": accepted,\n                # Для принятых пакетов ядро проверило car_id, source и sequence.\n                # Для заблокированных это лишь то, что написано в пакете.\n                \"car_id\": _claimed(message, \"car_id\"),\n                \"source\": _claimed(message, \"source\"),\n                \"sequence\": _claimed(message, \"sequence\"),\n                \"scenario\": scenario,\n                \"scenario_text\": SCENARIOS.get(scenario),\n                \"raw\": raw,\n            }\n            self.next_id += 1\n            self.events.appendleft(record)\n            self.counters[status] = self.counters.get(status, 0) + 1\n\n            if accepted:\n                car_id = message[\"car_id\"]\n                self.cars[car_id].add(received, message, result)\n                self.accepted_records.append({\"message\": message, \"status\": status, \"warnings\": result})\n                self.replayable[car_id].append(raw)\n                self._dirty = True\n            self.version += 1\n            return record\n\n    # ---------- сохранение ----------\n    def _save(self, force=False):\n        if not self.write_files or not self._dirty:\n            return\n        now = time.time()\n        if not force and now - self._last_save < 2.0:\n            return\n        path = self.data_dir / \"accepted_messages.json\"\n        tmp = path.with_suffix(\".json.tmp\")\n        with tmp.open(\"w\", encoding=\"utf-8\") as file:\n            json.dump(self.accepted_records, file, ensure_ascii=False, indent=4)\n        os.replace(tmp, path)\n        self._dirty = False\n        self._last_save = now\n\n    # ---------- данные для страницы ----------\n    def _elapsed(self, now):\n        extra = now - self.run_since if self.run_since is not None else 0.0\n        return self.run_time + extra\n\n    def state_view(self, car_id, now=None):\n        with self.lock:\n            now = time.time() if now is None else now\n            ref = now if self.state == \"running\" else (self.frozen_at or now)\n            car = self.cars.get(car_id)\n            car_view = None\n            if car is not None:\n                last = car.last\n                chart = [[round(t * 1000), s] for t, s in car.samples if ref - CHART_WINDOW_S <= t <= ref]\n                car_view = {\n                    \"car_id\": car_id,\n                    \"source\": dict(CARS)[car_id],\n                    \"has_data\": last is not None,\n                    \"last\": None if last is None else {**last, \"received_ms\": round(last[\"received\"] * 1000)},\n                    \"max_speed\": car.max_speed,\n                    \"avg_speed\": car.average(),\n                    \"avg_seconds\": round(car.time, 1),\n                    \"stale\": last is not None and (self.state != \"running\" or now - last[\"received\"] > STALE_AFTER_S),\n                    \"chart\": chart,\n                    \"chart_ref_ms\": round(ref * 1000),\n                }\n            return {\n                \"version\": self.version,\n                \"state\": self.state,\n                \"incidents\": self.incidents,\n                \"elapsed\": self._elapsed(now),\n                \"counters\": dict(self.counters),\n                \"stored\": len(self.events),\n                \"history_limit\": HISTORY_LIMIT,\n                \"car\": car_view,\n                \"cars\": [c for c, _ in CARS],\n                \"scenarios\": SCENARIOS,\n            }\n\n    FILTERS = {\n        \"all\": lambda r: True,\n        \"accepted\": lambda r: r[\"status\"] == \"Allow\",\n        \"alert\": lambda r: r[\"status\"] == \"Alert\",\n        \"blocked\": lambda r: r[\"status\"] == \"Blocked\",\n    }\n\n    def events_view(self, filt=\"all\", offset=0, limit=8):\n        with self.lock:\n            test = self.FILTERS.get(filt, self.FILTERS[\"all\"])\n            rows = [r for r in self.events if test(r)]\n            page = rows[offset:offset + limit]\n            return {\n                \"total\": len(rows),\n                \"offset\": offset,\n                \"rows\": [self._row(r) for r in page],\n            }\n\n    @staticmethod\n    def _row(r):\n        return {\n            \"id\": r[\"id\"],\n            \"received_ms\": round(r[\"received\"] * 1000),\n            \"status\": r[\"status\"],\n            \"car_id\": r[\"car_id\"],\n            \"source\": r[\"source\"],\n            \"sequence\": r[\"sequence\"],\n            \"accepted\": r[\"accepted\"],\n            \"reason\": None if r[\"status\"] == \"Allow\" else r[\"reasons\"][0][\"text\"],\n            \"more\": 0 if r[\"status\"] == \"Allow\" else len(r[\"reasons\"]) - 1,\n        }\n\n    def event_view(self, event_id):\n        with self.lock:\n            for r in self.events:\n                if r[\"id\"] == event_id:\n                    out = dict(r)\n                    out[\"received_ms\"] = round(r[\"received\"] * 1000)\n                    return out\n            return None\n\n\n# ---------- HTTP ----------\ndef make_handler(session, port):\n    allowed_hosts = {f\"127.0.0.1:{port}\", f\"localhost:{port}\"}\n    page_path = HERE / \"dashboard.html\"\n\n    class Handler(BaseHTTPRequestHandler):\n        def log_message(self, *args):  # не засоряем консоль запросами страницы\n            pass\n\n        def _send(self, code, body, ctype=\"application/json; charset=utf-8\"):\n            data = body if isinstance(body, bytes) else json.dumps(body, ensure_ascii=False).encode(\"utf-8\")\n            self.send_response(code)\n            self.send_header(\"Content-Type\", ctype)\n            self.send_header(\"Content-Length\", str(len(data)))\n            self.send_header(\"Cache-Control\", \"no-store\")\n            self.end_headers()\n            self.wfile.write(data)\n\n        def _host_ok(self):\n            if self.headers.get(\"Host\") not in allowed_hosts:\n                self._send(403, {\"error\": \"forbidden host\"})\n                return False\n            return True\n\n        def do_GET(self):\n            if not self._host_ok():\n                return\n            url = urlparse(self.path)\n            q = parse_qs(url.query)\n            if url.path in (\"/\", \"/index.html\"):\n                self._send(200, page_path.read_bytes(), \"text/html; charset=utf-8\")\n            elif url.path == \"/api/state\":\n                self._send(200, session.state_view(q.get(\"car\", [\"car_01\"])[0]))\n            elif url.path == \"/api/events\":\n                try:\n                    offset = max(0, int(q.get(\"offset\", [\"0\"])[0]))\n                    limit = min(50, max(1, int(q.get(\"limit\", [\"8\"])[0])))\n                except ValueError:\n                    self._send(400, {\"error\": \"bad paging\"})\n                    return\n                self._send(200, session.events_view(q.get(\"filter\", [\"all\"])[0], offset, limit))\n            elif url.path == \"/api/event\":\n                try:\n                    event = session.event_view(int(q.get(\"id\", [\"0\"])[0]))\n                except ValueError:\n                    event = None\n                self._send(200 if event else 404, event or {\"error\": \"not found\"})\n            else:\n                self._send(404, {\"error\": \"not found\"})\n\n        def do_POST(self):\n            if not self._host_ok():\n                return\n            # application/json заставляет браузер делать preflight для чужих сайтов,\n            # а мы его не разрешаем: другие сайты не смогут нажимать кнопки за вас.\n            if not self.headers.get(\"Content-Type\", \"\").startswith(\"application/json\"):\n                self._send(415, {\"error\": \"json only\"})\n                return\n            try:\n                length = int(self.headers.get(\"Content-Length\", \"0\"))\n                if not 0 < length <= 4096:\n                    raise ValueError\n                body = json.loads(self.rfile.read(length).decode(\"utf-8\"))\n                if not isinstance(body, dict):\n                    raise ValueError\n            except (ValueError, UnicodeDecodeError):\n                self._send(400, {\"error\": \"bad json\"})\n                return\n            path = urlparse(self.path).path\n            if path == \"/api/control\":\n                self._send(200, {\"ok\": session.control(body.get(\"action\"))})\n            elif path == \"/api/incidents\":\n                session.set_incidents(body.get(\"enabled\") is True)\n                self._send(200, {\"ok\": True})\n            elif path == \"/api/send\":\n                with session.lock:\n                    if session.state != \"running\":\n                        self._send(409, {\"error\": \"Тестовый пакет можно отправить только во время симуляции\"})\n                        return\n                    record = session.send_scenario(body.get(\"scenario\"), body.get(\"car\"))\n                if record is None:\n                    self._send(409, {\"error\": \"Для повтора нужен хотя бы один принятый пакет этого болида\"})\n                else:\n                    self._send(200, {\"ok\": True, \"id\": record[\"id\"]})\n            else:\n                self._send(404, {\"error\": \"not found\"})\n\n    return Handler\n\n\ndef run(port=PORT):\n    os.chdir(HERE)  # security_log.txt из main.py пишется в папку проекта\n    session = ShieldSession()\n    server = ThreadingHTTPServer((HOST, port), make_handler(session, port))\n    print(f\"F1 CyberShield: откройте http://{HOST}:{port}  (остановка: Ctrl+C)\")\n    try:\n        server.serve_forever()\n    except KeyboardInterrupt:\n        print(\"\\nСервер остановлен\")\n    finally:\n        session.shutdown()\n        server.server_close()\n\n\nif __name__ == \"__main__\":\n    run()\n"};
+  for (const [name, source] of Object.entries(sources)) python.FS.writeFile('/home/pyodide/' + name, source);
+  python.runPython("import sys; sys.path.insert(0, '/home/pyodide')");
+  await python.runPythonAsync("\nimport json, os\nfrom urllib.parse import urlparse, parse_qs\nimport dashboard\nos.makedirs('/home/pyodide/session', exist_ok=True)\nos.chdir('/home/pyodide/session')\nsession = dashboard.ShieldSession(data_dir='/home/pyodide/session', run_thread=False)\n\ndef phone_tick():\n    if session.state == 'running':\n        for car_id, _ in dashboard.CARS:\n            scenario = 'normal'\n            if session.incidents and session.rng.random() < dashboard.INCIDENT_CHANCE:\n                scenario = session.rng.choice(dashboard.INCIDENT_SCENARIOS)\n            session.send_scenario(scenario, car_id)\n        session._save()\n\ndef phone_api(path, body_json):\n    body = json.loads(body_json)\n    u = urlparse(path)\n    q = parse_qs(u.query)\n    if u.path == '/api/state':\n        value = session.state_view(q.get('car', ['car_01'])[0])\n    elif u.path == '/api/events':\n        value = session.events_view(q.get('filter', ['all'])[0], int(q.get('offset', [0])[0]), int(q.get('limit', [8])[0]))\n    elif u.path == '/api/event':\n        value = session.event_view(int(q.get('id', [0])[0]))\n    elif u.path == '/api/control':\n        value = {'ok': session.control(body.get('action'))}\n    elif u.path == '/api/incidents':\n        session.set_incidents(body.get('enabled') is True)\n        value = {'ok': True}\n    elif u.path == '/api/send':\n        if session.state != 'running':\n            raise ValueError('Сначала запустите симуляцию')\n        record = session.send_scenario(body.get('scenario'), body.get('car'))\n        if record is None:\n            raise ValueError('Для повтора нужен хотя бы один принятый пакет')\n        value = {'ok': True, 'id': record['id']}\n    elif u.path == '/api/export':\n        session._save(force=True)\n        name = q.get('name', ['accepted_messages.json'])[0]\n        if name not in ('accepted_messages.json', 'security_log.txt'):\n            raise ValueError('Unknown file')\n        value = {'name': name, 'text': open(name, encoding='utf-8').read() if os.path.exists(name) else ''}\n    else:\n        raise ValueError('Unknown route')\n    return json.dumps(value, ensure_ascii=False)\n");
+  call = python.globals.get('phone_api');
+  tick = python.globals.get('phone_tick');
+  // Use the original Python generator and checks; replace only the server's timer.
+  setInterval(() => {try {tick();} catch (e) {status.textContent = 'Ошибка симуляции: ' + e.message;}}, 500);
+  status.textContent = 'Готово · Python работает на этом устройстве';
+})();
+window.shieldApi = async (path, body) => {
+  await window.shieldReady;
+  return JSON.parse(call(path, JSON.stringify(body ?? null)));
+};
+window.shieldReady.catch(error => {status.textContent = 'Не удалось загрузить Python. Проверьте интернет и обновите страницу. ' + error.message;});
+for (const button of document.querySelectorAll('[data-export]')) button.onclick = async () => {
+  try {
+    const file = await window.shieldApi('/api/export?name=' + button.dataset.export);
+    const url = URL.createObjectURL(new Blob([file.text], {type: button.dataset.export.endsWith('.json') ? 'application/json' : 'text/plain;charset=utf-8'}));
+    const link = document.createElement('a'); link.href = url; link.download = file.name; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (error) {status.textContent = 'Ошибка экспорта: ' + error.message;}
+};
+
+</script>
+<script type="module">
+(() => {
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+const fmtT = ms => { const d=new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const fmtTms = ms => fmtT(ms)+'.'+String(new Date(ms).getMilliseconds()).padStart(3,'0');
+const t1 = v => v==null ? '—' : v.toFixed(1);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STATUS_RU = {Allow:'Принято',Alert:'Предупреждение',Blocked:'Заблокировано'};
+const HMAC_RU = {passed:['Пройдена','ok-t'],failed:['Не пройдена','bad-t'],not_checked:['Не выполнялась: пакет отклонён раньше','muted']};
+const WHEELS = {FL:'front_left',FR:'front_right',RL:'rear_left',RR:'rear_right'};
+
+const ui = {car:'car_01', filter:'all', offset:0, size:8, selected:null, follow:true, version:-1, state:null, seenTop:0, counters:null};
+
+async function api(path, body){
+  await window.shieldReady;
+  if (!window.shieldApi) throw new Error('Загрузка Python');
+  return window.shieldApi(path, body);
+}
+let toastTimer;
+function toast(msg){ $('toast').textContent=msg; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').textContent='',4000); }
+
+/* ---------- controls ---------- */
+const act = a => api('/api/control',{action:a}).then(poll).catch(e=>toast(e.message));
+$('bStart').onclick=()=>act('start'); $('bPause').onclick=()=>act('pause');
+$('bResume').onclick=()=>act('resume'); $('bStop').onclick=()=>act('stop');
+$('incid').onchange=e=>api('/api/incidents',{enabled:e.target.checked}).catch(er=>toast(er.message));
+$('bSend').onclick=()=>api('/api/send',{scenario:$('scen').value,car:ui.car}).then(r=>{ui.follow=true;poll();}).catch(e=>toast(e.message));
+function setCar(i){
+  ui.car = i ? 'car_02' : 'car_01';
+  $('seg').dataset.i=i; $('car0').setAttribute('aria-pressed',!i); $('car1').setAttribute('aria-pressed',!!i);
+  poll();
+}
+$('car0').onclick=()=>setCar(0); $('car1').onclick=()=>setCar(1);
+document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{
+  ui.filter=b.dataset.f; ui.offset=0; ui.follow=true;
+  document.querySelectorAll('.filters button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  loadEvents();
+});
+$('pgPrev').onclick=()=>{ui.offset=Math.max(0,ui.offset-ui.size);loadEvents();};
+$('pgNext').onclick=()=>{ui.offset+=ui.size;loadEvents();};
+
+/* ---------- state ---------- */
+let scenFilled=false;
+function renderState(s){
+  if(!scenFilled){ $('scen').innerHTML=Object.entries(s.scenarios).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join(''); scenFilled=true; }
+  const st=s.state;
+  const txt={idle:'Сессия не начата',running:'Симуляция идёт',paused:'Пауза',ended:'Сессия завершена'}[st];
+  $('stText').textContent=txt; $('stDot').className='dot'+(st==='running'?' on':st==='paused'?' pause':'');
+  $('bStart').disabled=!(st==='idle'||st==='ended');
+  $('bPause').disabled=st!=='running'; $('bResume').disabled=st!=='paused'; $('bStop').disabled=!(st==='running'||st==='paused');
+  $('bSend').disabled=st!=='running'; $('scen').disabled=st!=='running';
+  $('bStart').textContent = st==='ended' ? 'Новая сессия' : 'Начать симуляцию';
+  $('incid').checked=s.incidents;
+  const e=Math.floor(s.elapsed); $('sessT').textContent=`${pad(Math.floor(e/3600))}:${pad(Math.floor(e/60)%60)}:${pad(e%60)}`;
+
+  const c=s.counters, prev=ui.counters;
+  [['nAllow','Allow'],['nAlert','Alert'],['nBlk','Blocked']].forEach(([id,k])=>{
+    const el=$(id); el.textContent=c[k]||0;
+    if(prev && (c[k]||0)>(prev[k]||0)){el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
+  });
+  ui.counters=c;
+  $('pgLimit').textContent = s.stored>=s.history_limit ? `хранятся последние ${s.history_limit}` : '';
+
+  const car=s.car, L=car.last;
+  const val=(id,v,unit,warn)=>{const el=$(id); if(v==null){el.className='v none';el.textContent='Нет данных';} else {el.className='v num'+(warn?' warn':'');el.innerHTML=`${v}<small>${unit}</small>`;}};
+  const unusual = L && L.warnings.includes('Unusual speed');
+  val('kNow', L?Math.round(L.speed):null, 'км/ч', unusual);
+  $('kNowF').textContent = unusual ? 'необычно высокая скорость' : (car.stale && L ? 'устарело' : 'выбранный болид');
+  val('kMax', car.max_speed!=null?Math.round(car.max_speed):null, 'км/ч');
+  val('kAvg', car.avg_speed!=null?Math.round(car.avg_speed):null, 'км/ч');
+  $('kAvgF').textContent = car.avg_speed!=null ? `по времени, учтено ${Math.round(car.avg_seconds)} с` : 'нужно минимум 2 пакета подряд';
+
+  $('lastRx').textContent='Последние принятые данные: '+(L?fmtT(L.received_ms):'—');
+  const fr=$('fresh');
+  if(!L){fr.hidden=true;} else {fr.hidden=false; fr.className='badge '+(car.stale?'stale':'fresh'); fr.textContent=car.stale?(st==='running'?'устарело':'поступление остановлено'):'в эфире';}
+  $('teleBox').classList.toggle('stale-dim', !!(L && car.stale));
+
+  Object.entries(WHEELS).forEach(([k,w])=>{
+    const box=$('t'+k), wheel=$('w'+k);
+    if(!L){box.dataset.st='none';box.querySelector('.t').textContent='—';box.querySelector('.s').textContent='нет данных';wheel.setAttribute('fill','#3a3f35');return;}
+    const hi=L.warnings.includes('High tyre temperature: '+w), lo=L.warnings.includes('Low tyre temperature: '+w);
+    const stt=hi?'hot':lo?'cold':'ok';
+    box.dataset.st=stt; box.querySelector('.t').innerHTML=`${t1(L.tyres[w])}<small> °C</small>`;
+    box.querySelector('.s').textContent = hi?'выше учебного порога':lo?'ниже учебного порога':'без предупреждений';
+    wheel.setAttribute('fill', getComputedStyle(box).getPropertyValue('--tc').trim()||'#C9F24B');
+  });
+  const eng=$('eng');
+  if(!L){eng.dataset.st='none';$('engT').textContent='—';$('engS').textContent='нет данных';}
+  else{
+    const hi=L.warnings.includes('High engine temperature'), lo=L.warnings.includes('Low engine temperature');
+    eng.dataset.st=hi?'hot':lo?'cold':'ok';
+    $('engT').innerHTML=`${t1(L.engine_temperature)}<small> °C</small>`;
+    $('engS').textContent=hi?'выше учебного порога':lo?'ниже учебного порога':'без предупреждений';
+  }
+  drawChart(car);
+}
+
+/* ---------- chart ---------- */
+const cv=$('chart'), ctx=cv.getContext('2d'); let CW=0,CH=0, lastCar=null;
+function sizeChart(){const r=cv.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);CW=r.width;CH=r.height;cv.width=CW*dpr;cv.height=CH*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);if(lastCar)drawChart(lastCar);}
+new ResizeObserver(sizeChart).observe(cv);
+function drawChart(car){
+  lastCar=car; if(!CW) return;
+  const pts=car.chart, ref=car.chart_ref_ms, x0=ref-60000;
+  $('chartEmpty').hidden = pts.length>0;
+  ctx.clearRect(0,0,CW,CH);
+  const L=40,R=12,T=10,B=26,w=CW-L-R,h=CH-T-B,Y0=100,Y1=350;
+  const X=t=>L+w*(t-x0)/60000, Y=v=>T+h*(1-(Math.min(Y1,Math.max(Y0,v))-Y0)/(Y1-Y0));
+  ctx.font='11px "JetBrains Mono", Consolas, monospace';
+  for(let v=Y0;v<=Y1;v+=50){ctx.strokeStyle='rgba(214,236,170,.07)';ctx.beginPath();ctx.moveTo(L,Y(v));ctx.lineTo(L+w,Y(v));ctx.stroke();ctx.fillStyle='#5E6457';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(v,L-8,Y(v));}
+  ctx.textBaseline='alphabetic';
+  for(let k=0;k<=6;k++){const t=x0+k*10000;ctx.fillStyle='#5E6457';ctx.textAlign=k===0?'left':k===6?'right':'center';ctx.fillText(fmtT(t),X(t),CH-6);}
+  if(!pts.length) return;
+  // split into runs where consecutive points are at most 3 s apart
+  const runs=[]; let run=[pts[0]];
+  for(let i=1;i<pts.length;i++){ if(pts[i][0]-pts[i-1][0]>3000){runs.push(run);run=[];} run.push(pts[i]); }
+  runs.push(run);
+  const g=ctx.createLinearGradient(0,T,0,T+h); g.addColorStop(0,'rgba(201,242,75,.22)'); g.addColorStop(1,'rgba(201,242,75,0)');
+  runs.forEach(r=>{
+    if(r.length>1){
+      ctx.beginPath(); ctx.moveTo(X(r[0][0]),Y(r[0][1])); r.forEach(p=>ctx.lineTo(X(p[0]),Y(p[1])));
+      ctx.lineTo(X(r[r.length-1][0]),T+h); ctx.lineTo(X(r[0][0]),T+h); ctx.closePath(); ctx.fillStyle=g; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(X(r[0][0]),Y(r[0][1])); r.forEach(p=>ctx.lineTo(X(p[0]),Y(p[1])));
+      ctx.strokeStyle='#C9F24B'; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(X(r[0][0]),Y(r[0][1]),2.5,0,7); ctx.fillStyle='#C9F24B'; ctx.fill(); }
+  });
+  const e=pts[pts.length-1]; ctx.beginPath(); ctx.arc(X(e[0]),Y(e[1]),4,0,7); ctx.fillStyle='#C9F24B'; ctx.fill();
+}
+
+/* ---------- log table ---------- */
+const cell=(v,confirmed)=> v==null ? '<span class="undef">Не определено</span>' : confirmed ? esc(v) : `<span class="claimed" title="Указано в пакете, но не подтверждено: пакет заблокирован">${esc(v)}</span>`;
+async function loadEvents(){
+  const d=await api(`/api/events?filter=${ui.filter}&offset=${ui.offset}&limit=${ui.size}`);
+  if(ui.offset>0 && ui.offset>=d.total){ui.offset=Math.max(0,Math.floor((d.total-1)/ui.size)*ui.size); return loadEvents();}
+  const top=d.rows[0]?d.rows[0].id:0;
+  $('rows').innerHTML=d.rows.map(r=>`<tr data-id="${r.id}" tabindex="0" aria-selected="${r.id===ui.selected}" class="${ui.offset===0&&r.id>ui.seenTop&&ui.seenTop?'new':''}">
+    <td class="mono">${fmtT(r.received_ms)}</td><td>${cell(r.car_id,r.accepted)}</td><td class="mono">${cell(r.source,r.accepted)}</td>
+    <td class="mono">${cell(r.sequence,r.accepted)}</td><td><span class="st ${r.status}"><i></i>${STATUS_RU[r.status]}</span></td>
+    <td class="reason">${r.reason?esc(r.reason)+(r.more?` <span class="muted">+${r.more}</span>`:''):'—'}</td></tr>`).join('');
+  if(ui.offset===0) ui.seenTop=Math.max(ui.seenTop,top);
+  $('rowsEmpty').hidden=d.total>0;
+  const a=d.total?ui.offset+1:0, b=ui.offset+d.rows.length;
+  $('pgInfo').textContent=`Показано ${a}–${b} из ${d.total}`;
+  $('pgNum').textContent=Math.floor(ui.offset/ui.size)+1;
+  $('pgPrev').disabled=ui.offset===0; $('pgNext').disabled=b>=d.total;
+  $('rows').querySelectorAll('tr').forEach(tr=>{
+    const pickRow=()=>{ui.follow=false;selectEvent(+tr.dataset.id);};
+    tr.onclick=pickRow; tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pickRow();}};
+  });
+  if(ui.follow && ui.offset===0 && d.rows[0] && d.rows[0].id!==ui.selected) selectEvent(d.rows[0].id);
+  if(!d.total && ui.selected!=null){ui.selected=null;renderDetail(null);}
+}
+
+/* ---------- detail ---------- */
+async function selectEvent(id){
+  ui.selected=id;
+  $('rows').querySelectorAll('tr').forEach(tr=>tr.setAttribute('aria-selected',+tr.dataset.id===id));
+  try{ renderDetail(await api('/api/event?id='+id)); }catch(e){ renderDetail(null); }
+}
+function renderDetail(e){
+  if(!e){$('dStatus').innerHTML='';$('dBody').innerHTML='<div class="empty">Выберите строку в журнале, чтобы увидеть подробности.</div>';return;}
+  $('dStatus').innerHTML=`<span class="status ${e.status}">${STATUS_RU[e.status]}</span>`;
+  const acc=e.accepted, hm=HMAC_RU[e.hmac];
+  const confirmedNote = acc ? '' : ' <span class="muted" style="font-size:12px">(из пакета, не подтверждено)</span>';
+  const v=(x)=> x==null ? '<span class="undef">Не определено</span>' : esc(x)+confirmedNote;
+  const reasons = e.status==='Allow' ? '<span class="ok-t">Нет</span>' :
+    `<ul class="reasons">${e.reasons.map(r=>`<li class="${e.status==='Blocked'?'bad-t':'warn-t'}">${esc(r.text)}<code>${esc(r.code)}</code></li>`).join('')}</ul>`;
+  let html=`<dl class="kv">
+    <dt>Время получения</dt><dd class="mono">${fmtTms(e.received_ms)}</dd>
+    <dt>Болид</dt><dd>${v(e.car_id)}</dd>
+    <dt>Источник</dt><dd class="mono">${v(e.source)}</dd>
+    <dt>Номер пакета</dt><dd class="mono">${v(e.sequence)}</dd>
+    <dt>Проверка HMAC</dt><dd class="${hm[1]}">${hm[0]}</dd>
+    <dt>${e.status==='Blocked'?'Причина блокировки':'Предупреждения'}</dt><dd>${reasons}</dd>
+    ${e.scenario_text?`<dt>Сценарий генератора</dt><dd class="muted">${esc(e.scenario_text)}</dd>`:''}
+  </dl>`;
+  if(acc){
+    const m=e.raw.message, ty=m.tyre_temperatures;
+    html+=`<h3>Принятая телеметрия</h3><div class="acc">
+      <div><span class="lbl">Скорость</span><b class="num">${Math.round(m.speed)} км/ч</b></div>
+      <div><span class="lbl">Двигатель (ОЖ)</span><b class="num">${t1(+m.engine_temperature)} °C</b></div>
+      <div><span class="lbl">Передняя левая</span><b class="num">${t1(+ty.front_left)} °C</b></div>
+      <div><span class="lbl">Передняя правая</span><b class="num">${t1(+ty.front_right)} °C</b></div>
+      <div><span class="lbl">Задняя левая</span><b class="num">${t1(+ty.rear_left)} °C</b></div>
+      <div><span class="lbl">Задняя правая</span><b class="num">${t1(+ty.rear_right)} °C</b></div></div>`;
+  } else {
+    html+=`<h3>Телеметрия</h3><p class="muted" style="margin:0">Пакет заблокирован: его значения не попали в показатели и график.</p>`;
+  }
+  html+=`<h3>Исходные данные</h3><pre>${esc(JSON.stringify(e.raw,null,2))}</pre>`;
+  if(!ui.follow) html+=`<p style="margin:12px 0 0"><button class="btn follow" type="button" id="bFollow">Следить за новыми сообщениями</button></p>`;
+  $('dBody').innerHTML=html;
+  const bf=$('bFollow'); if(bf) bf.onclick=()=>{ui.follow=true;ui.offset=0;loadEvents();};
+}
+
+/* ---------- polling ---------- */
+let busy=false;
+async function poll(){
+  if(busy) return; busy=true;
+  try{
+    const s=await api('/api/state?car='+ui.car);
+    renderState(s);
+    if(s.version!==ui.version){ ui.version=s.version; await loadEvents(); }
+  }catch(e){ $('stText').textContent='Python загружается или недоступен — смотрите сообщение вверху'; $('stDot').className='dot'; }
+  finally{ busy=false; }
+}
+poll(); setInterval(poll,500);
+})();
+</script>
+</body>
+</html>

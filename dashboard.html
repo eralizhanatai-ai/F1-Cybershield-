@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 CyberShield</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header + control bar, KPI row, then two columns: telemetry, chart and log on the left; message details on the right. */
+:root{
+  --bg:#0A0B09; --surface:#111310; --surface-2:#161914;
+  --line:rgba(214,236,170,.08); --line-2:rgba(214,236,170,.16);
+  --fg:#ECEFE3; --muted:#8F9585; --dim:#5E6457;
+  --accent:#C9F24B; --accent-soft:rgba(201,242,75,.13); --accent-ink:#151B04;
+  --warn:#F2B544; --warn-soft:rgba(242,181,68,.13);
+  --crit:#FF5D5D; --crit-soft:rgba(255,93,93,.13);
+  --cold:#71B9FF;
+  --f-ui:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,Menlo,monospace;
+  --r:16px; --ease:cubic-bezier(.2,.8,.2,1); --spring:cubic-bezier(.34,1.4,.5,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg);margin:0}
+body{font-family:var(--f-ui);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden;padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--f-mono)}
+.wrap{max-width:1440px;margin:0 auto;position:relative;z-index:1}
+[hidden]{display:none!important}
+
+.aura{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.aura i{position:absolute;border-radius:50%;filter:blur(90px);opacity:0;animation:auraIn 2s var(--ease) .1s forwards, drift 26s ease-in-out infinite alternate}
+.aura .a1{width:620px;height:380px;left:-160px;top:-180px;background:radial-gradient(closest-side,rgba(201,242,75,.32),transparent)}
+.aura .a2{width:520px;height:520px;right:-220px;top:60px;background:radial-gradient(closest-side,rgba(150,210,60,.16),transparent);animation-delay:.3s,-8s}
+@keyframes auraIn{to{opacity:1}}
+@keyframes drift{to{transform:translate3d(50px,30px,0) scale(1.1)}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));background:rgba(10,11,9,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;padding-block:12px}
+.row+.row{border-top:1px solid var(--line);padding-block:10px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em;font-size:17px}
+.logo small{display:block;font-weight:500;font-size:11.5px;color:var(--muted);letter-spacing:0}
+.pill{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border:1px solid var(--line-2);border-radius:999px;color:var(--muted);display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.pill.sim{color:var(--accent);border-color:rgba(201,242,75,.45);background:var(--accent-soft);font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.dot.on{background:var(--accent);animation:pulse 1.8s ease-out infinite}
+.dot.pause{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(201,242,75,.5)}100%{box-shadow:0 0 0 8px rgba(201,242,75,0)}}
+.spacer{flex:1}
+.lbl{font-family:var(--f-mono);font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.seg{position:relative;display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;padding:3px}
+.seg button{position:relative;z-index:1;background:none;border:0;padding:7px 16px;border-radius:9px;cursor:pointer;font-weight:700;color:var(--muted);transition:color .3s;white-space:nowrap}
+.seg button[aria-pressed="true"]{color:var(--accent-ink)}
+.seg .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:9px;background:var(--accent);transition:transform .45s var(--spring)}
+.seg[data-i="1"] .ind{transform:translateX(100%)}
+.clock b{font-family:var(--f-mono);font-size:20px;font-weight:600;margin-left:8px}
+.btn{border:1px solid var(--line-2);background:var(--surface-2);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;transition:border-color .2s,background .2s,opacity .2s;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:rgba(201,242,75,.5)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger:hover:not(:disabled){border-color:rgba(255,93,93,.6)}
+.select{appearance:none;-webkit-appearance:none;background:var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238F9585' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line-2);border-radius:10px;padding:8px 32px 8px 12px;font-weight:600;cursor:pointer;max-width:100%}
+.check{display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:var(--muted);font-weight:600}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+.sep{width:1px;height:26px;background:var(--line-2)}
+.toast{font-size:12.5px;color:var(--warn)}
+
+/* layout */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:18px 0 16px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;align-items:start}
+.left{display:grid;gap:16px;min-width:0}
+.card{position:relative;background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0;animation:rise .7s var(--ease) both}
+.card-h{display:flex;align-items:center;gap:10px 14px;margin-bottom:14px;flex-wrap:wrap}
+.card-h h2{font-size:16px;font-weight:800;margin:0}
+.card-h .r{margin-left:auto}
+.muted{color:var(--muted)}
+.badge{font-family:var(--f-mono);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px}
+.badge.stale{color:var(--warn);background:var(--warn-soft);border:1px solid rgba(242,181,68,.35)}
+.badge.fresh{color:var(--accent);background:var(--accent-soft);border:1px solid rgba(201,242,75,.3)}
+
+.kpi{padding:14px 16px}
+.kpi .v{font-size:clamp(24px,2.3vw,34px);font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-top:6px;white-space:nowrap}
+.kpi .v small{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:0;margin-left:4px}
+.kpi .v.none{font-size:18px;color:var(--dim);font-weight:700;letter-spacing:0;padding-top:8px}
+.kpi .f{font-size:11.5px;color:var(--muted);margin-top:4px}
+.kpi.ok .v{color:var(--accent)} .kpi.wa .v{color:var(--warn)} .kpi.bl .v{color:var(--crit)}
+.kpi.ok{border-color:rgba(201,242,75,.18)} .kpi.wa{border-color:rgba(242,181,68,.2)} .kpi.bl{border-color:rgba(255,93,93,.2)}
+.kpi .v.warn{color:var(--warn)}
+.bump{animation:bump .5s var(--spring)}
+@keyframes bump{35%{transform:scale(1.1)}}
+
+/* telemetry */
+.tele{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:18px;align-items:center}
+.chassis{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,150px) minmax(0,1fr);grid-template-rows:1fr 1fr;gap:14px 12px;align-items:center}
+.chassis svg{grid-column:2;grid-row:1/3;width:100%;height:auto;max-height:290px}
+.tyre{border:1px solid var(--line-2);border-radius:12px;padding:10px 12px}
+.tyre .t{font-size:24px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.tyre .t small{font-size:12px;color:var(--muted);font-weight:600}
+.tyre .s{font-size:11.5px;color:var(--muted)}
+.tyre.fl{grid-column:1;grid-row:1}.tyre.fr{grid-column:3;grid-row:1}.tyre.rl{grid-column:1;grid-row:2}.tyre.rr{grid-column:3;grid-row:2}
+[data-st="ok"]{--tc:var(--accent)}[data-st="hot"]{--tc:var(--warn)}[data-st="cold"]{--tc:var(--cold)}[data-st="none"]{--tc:var(--dim)}
+.tyre[data-st] .t,.engine[data-st] .t{color:var(--tc)}
+.tyre[data-st]{border-color:color-mix(in srgb,var(--tc) 35%,transparent)}
+.car-body{fill:rgba(236,239,227,.035);stroke:rgba(236,239,227,.5);stroke-width:1.4}
+.car-line{stroke:rgba(236,239,227,.32);stroke-width:1.2;fill:none}
+.wheel{transition:fill .5s;stroke:rgba(0,0,0,.5)}
+.engine{border:1px solid var(--line-2);border-radius:14px;padding:16px;text-align:left}
+.engine .t{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:6px;white-space:nowrap}
+.engine .t small{font-size:14px;color:var(--muted);font-weight:600}
+.engine[data-st]{border-color:color-mix(in srgb,var(--tc) 35%,transparent)}
+.stale-dim{opacity:.55;transition:opacity .4s}
+
+/* chart */
+.chartbox{position:relative;height:220px}
+.chartbox canvas{position:absolute;inset:0;width:100%;height:100%}
+.chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim);font-size:13px}
+
+/* table */
+.filters{display:flex;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+.filters button{background:none;border:0;padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-right:1px solid var(--line-2)}
+.filters button:last-child{border-right:0}
+.filters button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tablebox{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+th{font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.reason{white-space:normal;min-width:180px}
+tbody tr{cursor:pointer;transition:background .2s}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+tbody tr[aria-selected="true"]{background:rgba(201,242,75,.09);box-shadow:inset 3px 0 0 var(--accent)}
+tbody tr.new{animation:rowIn .6s var(--ease)}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}}
+.st{display:inline-flex;align-items:center;gap:7px}
+.st i{width:7px;height:7px;border-radius:50%}
+.st.Allow i{background:var(--accent)}.st.Alert i{background:var(--warn)}.st.Blocked i{background:var(--crit)}
+.claimed{color:var(--dim)}
+.claimed::after{content:" ?";color:var(--warn)}
+.undef{color:var(--dim);font-style:italic}
+.pager{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.pager .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.empty{color:var(--dim);font-size:13px;padding:18px 4px}
+
+/* detail */
+.detail{position:sticky;top:132px;max-height:calc(100vh - 150px);overflow-y:auto;scrollbar-width:thin}
+.status{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.status.Allow{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(201,242,75,.4)}
+.status.Alert{background:var(--warn-soft);color:var(--warn);border:1px solid rgba(242,181,68,.4)}
+.status.Blocked{background:var(--crit-soft);color:var(--crit);border:1px solid rgba(255,93,93,.4)}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);margin:0}
+.kv dt,.kv dd{padding:8px 0;border-bottom:1px solid var(--line);margin:0}
+.kv dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-top:10px}
+.kv dd{font-size:13.5px;overflow-wrap:anywhere}
+.ok-t{color:var(--accent)} .bad-t{color:var(--crit)} .warn-t{color:var(--warn)}
+.reasons{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.reasons code{font-family:var(--f-mono);font-size:11px;color:var(--dim);margin-left:6px}
+h3{font-size:15px;margin:18px 0 8px;font-weight:800}
+.acc{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.acc div{padding:10px 12px 10px 0;border-bottom:1px solid var(--line)}
+.acc div:nth-child(odd){border-right:1px solid var(--line)}
+.acc div:nth-child(even){padding-left:14px}
+.acc b{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em}
+pre{font-family:var(--f-mono);font-size:11.5px;line-height:1.55;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px;margin:0;white-space:pre}
+.note{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:12.5px;font-style:italic;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.follow{font-size:12px}
+
+@media (max-width:1200px){
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .detail{position:relative;top:0;max-height:none}
+}
+@media (max-width:760px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tele{grid-template-columns:minmax(0,1fr)}
+  .top{position:relative}
+}
+@media (max-width:520px){
+  .chassis{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto}
+  .chassis svg{grid-column:1/3;grid-row:1;max-height:200px}
+  .tyre.fl{grid-column:1;grid-row:2}.tyre.fr{grid-column:2;grid-row:2}.tyre.rl{grid-column:1;grid-row:3}.tyre.rr{grid-column:2;grid-row:3}
+  .kv{grid-template-columns:110px minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.aura i{opacity:1}}
+</style>
+</head>
+<body>
+<div class="aura" aria-hidden="true"><i class="a1"></i><i class="a2"></i></div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row">
+      <div class="logo">
+        <svg width="30" height="30" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M14 2.5 4 6.5v7c0 6 4.3 10.4 10 12 5.7-1.6 10-6 10-12v-7l-10-4Z" stroke="#C9F24B" stroke-width="1.6"/><path d="M8.5 15.5h5l1.5-4 2 6 1.2-2h1.3" stroke="#C9F24B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>F1 CyberShield<small>Учебная симуляция телеметрии</small></div>
+      </div>
+      <span class="pill sim">Симуляция</span>
+      <span class="spacer"></span>
+      <span class="lbl">Болид</span>
+      <div class="seg" id="seg" data-i="0" role="group" aria-label="Выбор болида">
+        <span class="ind"></span>
+        <button type="button" id="car0" aria-pressed="true">Болид 01</button>
+        <button type="button" id="car1" aria-pressed="false">Болид 02</button>
+      </div>
+      <div class="clock"><span class="lbl">Время сессии</span><b class="num" id="sessT">00:00:00</b></div>
+    </div>
+    <div class="row">
+      <span class="pill" id="stPill"><span class="dot" id="stDot"></span><span id="stText">Сессия не начата</span></span>
+      <button class="btn primary" id="bStart" type="button">Начать симуляцию</button>
+      <button class="btn" id="bPause" type="button">Пауза</button>
+      <button class="btn" id="bResume" type="button">Продолжить</button>
+      <button class="btn danger" id="bStop" type="button">Завершить сессию</button>
+      <span class="sep"></span>
+      <label class="lbl" for="scen">Тестовый пакет</label>
+      <select class="select" id="scen"></select>
+      <button class="btn" id="bSend" type="button">Отправить</button>
+      <label class="check"><input type="checkbox" id="incid"> Случайные инциденты</label>
+      <span class="toast" id="toast" role="status"></span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="kpis" aria-label="Показатели">
+    <div class="card kpi"><div class="lbl">Текущая скорость</div><div class="v num" id="kNow"></div><div class="f" id="kNowF">выбранный болид</div></div>
+    <div class="card kpi"><div class="lbl">Максимальная</div><div class="v num" id="kMax"></div><div class="f">за сессию</div></div>
+    <div class="card kpi"><div class="lbl">Средняя за сессию</div><div class="v num" id="kAvg"></div><div class="f" id="kAvgF" title="Интеграл скорости по времени получения пакетов, делённый на учтённое время. Интервалы больше 3 с и паузы не учитываются.">по времени получения</div></div>
+    <div class="card kpi ok"><div class="lbl">Без предупреждений</div><div class="v num" id="nAllow">0</div><div class="f">оба болида</div></div>
+    <div class="card kpi wa"><div class="lbl">Предупреждения</div><div class="v num" id="nAlert">0</div><div class="f">приняты с пометкой</div></div>
+    <div class="card kpi bl"><div class="lbl">Заблокировано</div><div class="v num" id="nBlk">0</div><div class="f">не попали в телеметрию</div></div>
+  </section>
+
+  <div class="main">
+    <div class="left">
+      <section class="card" style="animation-delay:.05s">
+        <div class="card-h">
+          <h2>Телеметрия</h2>
+          <span class="muted r" id="lastRx">Последние принятые данные: —</span>
+          <span class="badge" id="fresh" hidden></span>
+        </div>
+        <div class="tele" id="teleBox">
+          <div class="chassis">
+            <div class="tyre fl" id="tFL" data-st="none"><div class="lbl">Передняя левая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <div class="tyre fr" id="tFR" data-st="none"><div class="lbl">Передняя правая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <svg viewBox="0 0 200 360" role="img" aria-label="Схема болида, вид сверху">
+              <rect x="26" y="18" width="148" height="14" rx="4" class="car-body"/>
+              <path d="M93 32 L107 32 L113 118 L87 118 Z" class="car-body"/>
+              <path d="M58 92 L86 100 M142 92 L114 100 M58 112 L87 112 M142 112 L113 112" class="car-line"/>
+              <path d="M87 118 C70 136 60 168 62 198 L66 262 C70 286 86 300 100 302 C114 300 130 286 134 262 L138 198 C140 168 130 136 113 118 Z" class="car-body"/>
+              <path d="M74 150 C70 176 70 210 74 240 M126 150 C130 176 130 210 126 240" class="car-line"/>
+              <ellipse cx="100" cy="168" rx="12" ry="22" class="car-body"/>
+              <path d="M84 158 C88 140 112 140 116 158" class="car-line" stroke-width="2.4"/>
+              <path d="M56 270 L70 262 M144 270 L130 262 M56 292 L74 286 M144 292 L126 286" class="car-line"/>
+              <rect x="46" y="318" width="108" height="20" rx="4" class="car-body"/>
+              <rect x="24" y="74" width="32" height="54" rx="8" class="wheel" id="wFL" fill="#3a3f35"/>
+              <rect x="144" y="74" width="32" height="54" rx="8" class="wheel" id="wFR" fill="#3a3f35"/>
+              <rect x="18" y="250" width="38" height="62" rx="9" class="wheel" id="wRL" fill="#3a3f35"/>
+              <rect x="144" y="250" width="38" height="62" rx="9" class="wheel" id="wRR" fill="#3a3f35"/>
+            </svg>
+            <div class="tyre rl" id="tRL" data-st="none"><div class="lbl">Задняя левая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <div class="tyre rr" id="tRR" data-st="none"><div class="lbl">Задняя правая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+          </div>
+          <div class="engine" id="eng" data-st="none">
+            <div class="lbl">Температура двигателя</div>
+            <div class="muted" style="font-size:12px">охлаждающая жидкость</div>
+            <div class="t num" id="engT">—</div>
+            <div class="muted" style="font-size:12px" id="engS">нет данных</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="animation-delay:.1s">
+        <div class="card-h"><h2>Скорость</h2><span class="muted">последние 60 секунд, только принятые пакеты</span></div>
+        <div class="chartbox"><canvas id="chart" role="img" aria-label="График скорости за последние 60 секунд"></canvas><div class="chart-empty" id="chartEmpty">Нет данных</div></div>
+      </section>
+
+      <section class="card" style="animation-delay:.15s">
+        <div class="card-h">
+          <h2>Журнал сообщений</h2>
+          <div class="filters r" role="group" aria-label="Фильтр журнала">
+            <button type="button" data-f="all" aria-pressed="true">Все</button>
+            <button type="button" data-f="accepted" aria-pressed="false">Принятые</button>
+            <button type="button" data-f="alert" aria-pressed="false">Предупреждения</button>
+            <button type="button" data-f="blocked" aria-pressed="false">Блокировки</button>
+          </div>
+        </div>
+        <div class="tablebox">
+          <table>
+            <thead><tr><th>Время ▾</th><th>Болид</th><th>Источник</th><th>№</th><th>Статус</th><th>Причина</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="rowsEmpty">Пока нет сообщений. Нажмите «Начать симуляцию».</div>
+        <div class="pager">
+          <span id="pgInfo">Показано 0 из 0</span>
+          <span class="muted" id="pgLimit"></span>
+          <div class="r">
+            <button class="btn" id="pgPrev" type="button">‹ Назад</button>
+            <span class="num" id="pgNum">1</span>
+            <button class="btn" id="pgNext" type="button">Далее ›</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="card detail" id="detail" style="animation-delay:.08s" aria-live="polite">
+      <div class="card-h"><h2>Детали сообщения</h2><span class="r" id="dStatus"></span></div>
+      <div id="dBody"><div class="empty">Выберите строку в журнале, чтобы увидеть подробности.</div></div>
+      <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 4.6v.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Заблокированные пакеты не обновляют показатели, график, максимальную и среднюю скорость.</div>
+    </aside>
+  </div>
+</main>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+const fmtT = ms => { const d=new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const fmtTms = ms => fmtT(ms)+'.'+String(new Date(ms).getMilliseconds()).padStart(3,'0');
+const t1 = v => v==null ? '—' : v.toFixed(1);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STATUS_RU = {Allow:'Принято',Alert:'Предупреждение',Blocked:'Заблокировано'};
+const HMAC_RU = {passed:['Пройдена','ok-t'],failed:['Не пройдена','bad-t'],not_checked:['Не выполнялась: пакет отклонён раньше','muted']};
+const WHEELS = {FL:'front_left',FR:'front_right',RL:'rear_left',RR:'rear_right'};
+
+const ui = {car:'car_01', filter:'all', offset:0, size:8, selected:null, follow:true, version:-1, state:null, seenTop:0, counters:null};
+
+async function api(path, body){
+  const opt = body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || ('HTTP '+r.status));
+  return j;
+}
+let toastTimer;
+function toast(msg){ $('toast').textContent=msg; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').textContent='',4000); }
+
+/* ---------- controls ---------- */
+const act = a => api('/api/control',{action:a}).then(poll).catch(e=>toast(e.message));
+$('bStart').onclick=()=>act('start'); $('bPause').onclick=()=>act('pause');
+$('bResume').onclick=()=>act('resume'); $('bStop').onclick=()=>act('stop');
+$('incid').onchange=e=>api('/api/incidents',{enabled:e.target.checked}).catch(er=>toast(er.message));
+$('bSend').onclick=()=>api('/api/send',{scenario:$('scen').value,car:ui.car}).then(r=>{ui.follow=true;poll();}).catch(e=>toast(e.message));
+function setCar(i){
+  ui.car = i ? 'car_02' : 'car_01';
+  $('seg').dataset.i=i; $('car0').setAttribute('aria-pressed',!i); $('car1').setAttribute('aria-pressed',!!i);
+  poll();
+}
+$('car0').onclick=()=>setCar(0); $('car1').onclick=()=>setCar(1);
+document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{
+  ui.filter=b.dataset.f; ui.offset=0; ui.follow=true;
+  document.querySelectorAll('.filters button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  loadEvents();
+});
+$('pgPrev').onclick=()=>{ui.offset=Math.max(0,ui.offset-ui.size);loadEvents();};
+$('pgNext').onclick=()=>{ui.offset+=ui.size;loadEvents();};
+
+/* ---------- state ---------- */
+let scenFilled=false;
+function renderState(s){
+  if(!scenFilled){ $('scen').innerHTML=Object.entries(s.scenarios).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join(''); scenFilled=true; }
+  const st=s.state;
+  const txt={idle:'Сессия не начата',running:'Симуляция идёт',paused:'Пауза',ended:'Сессия завершена'}[st];
+  $('stText').textContent=txt; $('stDot').className='dot'+(st==='running'?' on':st==='paused'?' pause':'');
+  $('bStart').disabled=!(st==='idle'||st==='ended');
+  $('bPause').disabled=st!=='running'; $('bResume').disabled=st!=='paused'; $('bStop').disabled=!(st==='running'||st==='paused');
+  $('bSend').disabled=st!=='running'; $('scen').disabled=st!=='running';
+  $('bStart').textContent = st==='ended' ? 'Новая сессия' : 'Начать симуляцию';
+  $('incid').checked=s.incidents;
+  const e=Math.floor(s.elapsed); $('sessT').textContent=`${pad(Math.floor(e/3600))}:${pad(Math.floor(e/60)%60)}:${pad(e%60)}`;
+
+  const c=s.counters, prev=ui.counters;
+  [['nAllow','Allow'],['nAlert','Alert'],['nBlk','Blocked']].forEach(([id,k])=>{
+    const el=$(id); el.textContent=c[k]||0;
+    if(prev && (c[k]||0)>(prev[k]||0)){el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
+  });
+  ui.counters=c;
+  $('pgLimit').textContent = s.stored>=s.history_limit ? `хранятся последние ${s.history_limit}` : '';
+
+  const car=s.car, L=car.last;
+  const val=(id,v,unit,warn)=>{const el=$(id); if(v==null){el.className='v none';el.textContent='Нет данных';} else {el.className='v num'+(warn?' warn':'');el.innerHTML=`${v}<small>${unit}</small>`;}};
+  const unusual = L && L.warnings.includes('Unusual speed');
+  val('kNow', L?Math.round(L.speed):null, 'км/ч', unusual);
+  $('kNowF').textContent = unusual ? 'необычно высокая скорость' : (car.stale && L ? 'устарело' : 'выбранный болид');
+  val('kMax', car.max_speed!=null?Math.round(car.max_speed):null, 'км/ч');
+  val('kAvg', car.avg_speed!=null?Math.round(car.avg_speed):null, 'км/ч');
+  $('kAvgF').textContent = car.avg_speed!=null ? `по времени, учтено ${Math.round(car.avg_seconds)} с` : 'нужно минимум 2 пакета подряд';
+
+  $('lastRx').textContent='Последние принятые данные: '+(L?fmtT(L.received_ms):'—');
+  const fr=$('fresh');
+  if(!L){fr.hidden=true;} else {fr.hidden=false; fr.className='badge '+(car.stale?'stale':'fresh'); fr.textContent=car.stale?(st==='running'?'устарело':'поступление остановлено'):'в эфире';}
+  $('teleBox').classList.toggle('stale-dim', !!(L && car.stale));
+
+  Object.entries(WHEELS).forEach(([k,w])=>{
+    const box=$('t'+k), wheel=$('w'+k);
+    if(!L){box.dataset.st='none';box.querySelector('.t').textContent='—';box.querySelector('.s').textContent='нет данных';wheel.setAttribute('fill','#3a3f35');return;}
+    const hi=L.warnings.includes('High tyre temperature: '+w), lo=L.warnings.includes('Low tyre temperature: '+w);
+    const stt=hi?'hot':lo?'cold':'ok';
+    box.dataset.st=stt; box.querySelector('.t').innerHTML=`${t1(L.tyres[w])}<small> °C</small>`;
+    box.querySelector('.s').textContent = hi?'выше учебного порога':lo?'ниже учебного порога':'без предупреждений';
+    wheel.setAttribute('fill', getComputedStyle(box).getPropertyValue('--tc').trim()||'#C9F24B');
+  });
+  const eng=$('eng');
+  if(!L){eng.dataset.st='none';$('engT').textContent='—';$('engS').textContent='нет данных';}
+  else{
+    const hi=L.warnings.includes('High engine temperature'), lo=L.warnings.includes('Low engine temperature');
+    eng.dataset.st=hi?'hot':lo?'cold':'ok';
+    $('engT').innerHTML=`${t1(L.engine_temperature)}<small> °C</small>`;
+    $('engS').textContent=hi?'выше учебного порога':lo?'ниже учебного порога':'без предупреждений';
+  }
+  drawChart(car);
+}
+
+/* ---------- chart ---------- */
+const cv=$('chart'), ctx=cv.getContext('2d'); let CW=0,CH=0, lastCar=null;
+function sizeChart(){const r=cv.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);CW=r.width;CH=r.height;cv.width=CW*dpr;cv.height=CH*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);if(lastCar)drawChart(lastCar);}
+new ResizeObserver(sizeChart).observe(cv);
+function drawChart(car){
+  lastCar=car; if(!CW) return;
+  const pts=car.chart, ref=car.chart_ref_ms, x0=ref-60000;
+  $('chartEmpty').hidden = pts.length>0;
+  ctx.clearRect(0,0,CW,CH);
+  const L=40,R=12,T=10,B=26,w=CW-L-R,h=CH-T-B,Y0=100,Y1=350;
+  const X=t=>L+w*(t-x0)/60000, Y=v=>T+h*(1-(Math.min(Y1,Math.max(Y0,v))-Y0)/(Y1-Y0));
+  ctx.font='11px "JetBrains Mono", Consolas, monospace';
+  for(let v=Y0;v<=Y1;v+=50){ctx.strokeStyle='rgba(214,236,170,.07)';ctx.beginPath();ctx.moveTo(L,Y(v));ctx.lineTo(L+w,Y(v));ctx.stroke();ctx.fillStyle='#5E6457';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(v,L-8,Y(v));}
+  ctx.textBaseline='alphabetic';
+  for(let k=0;k<=6;k++){const t=x0+k*10000;ctx.fillStyle='#5E6457';ctx.textAlign=k===0?'left':k===6?'right':'center';ctx.fillText(fmtT(t),X(t),CH-6);}
+  if(!pts.length) return;
+  // split into runs where consecutive points are at most 3 s apart
+  const runs=[]; let run=[pts[0]];
+  for(let i=1;i<pts.length;i++){ if(pts[i][0]-pts[i-1][0]>3000){runs.push(run);run=[];} run.push(pts[i]); }
+  runs.push(run);
+  const g=ctx.createLinearGradient(0,T,0,T+h); g.addColorStop(0,'rgba(201,242,75,.22)'); g.addColorStop(1,'rgba(201,242,75,0)');
+  runs.forEach(r=>{
+    if(r.length>1){
+      ctx.beginPath(); ctx.moveTo(X(r[0][0]),Y(r[0][1])); r.forEach(p=>ctx.lineTo(X(p[0]),Y(p[1])));
+      ctx.lineTo(X(r[r.length-1][0]),T+h); ctx.lineTo(X(r[0][0]),T+h); ctx.closePath(); ctx.fillStyle=g; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(X(r[0][0]),Y(r[0][1])); r.forEach(p=>ctx.lineTo(X(p[0]),Y(p[1])));
+      ctx.strokeStyle='#C9F24B'; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(X(r[0][0]),Y(r[0][1]),2.5,0,7); ctx.fillStyle='#C9F24B'; ctx.fill(); }
+  });
+  const e=pts[pts.length-1]; ctx.beginPath(); ctx.arc(X(e[0]),Y(e[1]),4,0,7); ctx.fillStyle='#C9F24B'; ctx.fill();
+}
+
+/* ---------- log table ---------- */
+const cell=(v,confirmed)=> v==null ? '<span class="undef">Не определено</span>' : confirmed ? esc(v) : `<span class="claimed" title="Указано в пакете, но не подтверждено: пакет заблокирован">${esc(v)}</span>`;
+async function loadEvents(){
+  const d=await api(`/api/events?filter=${ui.filter}&offset=${ui.offset}&limit=${ui.size}`);
+  if(ui.offset>0 && ui.offset>=d.total){ui.offset=Math.max(0,Math.floor((d.total-1)/ui.size)*ui.size); return loadEvents();}
+  const top=d.rows[0]?d.rows[0].id:0;
+  $('rows').innerHTML=d.rows.map(r=>`<tr data-id="${r.id}" tabindex="0" aria-selected="${r.id===ui.selected}" class="${ui.offset===0&&r.id>ui.seenTop&&ui.seenTop?'new':''}">
+    <td class="mono">${fmtT(r.received_ms)}</td><td>${cell(r.car_id,r.accepted)}</td><td class="mono">${cell(r.source,r.accepted)}</td>
+    <td class="mono">${cell(r.sequence,r.accepted)}</td><td><span class="st ${r.status}"><i></i>${STATUS_RU[r.status]}</span></td>
+    <td class="reason">${r.reason?esc(r.reason)+(r.more?` <span class="muted">+${r.more}</span>`:''):'—'}</td></tr>`).join('');
+  if(ui.offset===0) ui.seenTop=Math.max(ui.seenTop,top);
+  $('rowsEmpty').hidden=d.total>0;
+  const a=d.total?ui.offset+1:0, b=ui.offset+d.rows.length;
+  $('pgInfo').textContent=`Показано ${a}–${b} из ${d.total}`;
+  $('pgNum').textContent=Math.floor(ui.offset/ui.size)+1;
+  $('pgPrev').disabled=ui.offset===0; $('pgNext').disabled=b>=d.total;
+  $('rows').querySelectorAll('tr').forEach(tr=>{
+    const pickRow=()=>{ui.follow=false;selectEvent(+tr.dataset.id);};
+    tr.onclick=pickRow; tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pickRow();}};
+  });
+  if(ui.follow && ui.offset===0 && d.rows[0] && d.rows[0].id!==ui.selected) selectEvent(d.rows[0].id);
+  if(!d.total && ui.selected!=null){ui.selected=null;renderDetail(null);}
+}
+
+/* ---------- detail ---------- */
+async function selectEvent(id){
+  ui.selected=id;
+  $('rows').querySelectorAll('tr').forEach(tr=>tr.setAttribute('aria-selected',+tr.dataset.id===id));
+  try{ renderDetail(await api('/api/event?id='+id)); }catch(e){ renderDetail(null); }
+}
+function renderDetail(e){
+  if(!e){$('dStatus').innerHTML='';$('dBody').innerHTML='<div class="empty">Выберите строку в журнале, чтобы увидеть подробности.</div>';return;}
+  $('dStatus').innerHTML=`<span class="status ${e.status}">${STATUS_RU[e.status]}</span>`;
+  const acc=e.accepted, hm=HMAC_RU[e.hmac];
+  const confirmedNote = acc ? '' : ' <span class="muted" style="font-size:12px">(из пакета, не подтверждено)</span>';
+  const v=(x)=> x==null ? '<span class="undef">Не определено</span>' : esc(x)+confirmedNote;
+  const reasons = e.status==='Allow' ? '<span class="ok-t">Нет</span>' :
+    `<ul class="reasons">${e.reasons.map(r=>`<li class="${e.status==='Blocked'?'bad-t':'warn-t'}">${esc(r.text)}<code>${esc(r.code)}</code></li>`).join('')}</ul>`;
+  let html=`<dl class="kv">
+    <dt>Время получения</dt><dd class="mono">${fmtTms(e.received_ms)}</dd>
+    <dt>Болид</dt><dd>${v(e.car_id)}</dd>
+    <dt>Источник</dt><dd class="mono">${v(e.source)}</dd>
+    <dt>Номер пакета</dt><dd class="mono">${v(e.sequence)}</dd>
+    <dt>Проверка HMAC</dt><dd class="${hm[1]}">${hm[0]}</dd>
+    <dt>${e.status==='Blocked'?'Причина блокировки':'Предупреждения'}</dt><dd>${reasons}</dd>
+    ${e.scenario_text?`<dt>Сценарий генератора</dt><dd class="muted">${esc(e.scenario_text)}</dd>`:''}
+  </dl>`;
+  if(acc){
+    const m=e.raw.message, ty=m.tyre_temperatures;
+    html+=`<h3>Принятая телеметрия</h3><div class="acc">
+      <div><span class="lbl">Скорость</span><b class="num">${Math.round(m.speed)} км/ч</b></div>
+      <div><span class="lbl">Двигатель (ОЖ)</span><b class="num">${t1(+m.engine_temperature)} °C</b></div>
+      <div><span class="lbl">Передняя левая</span><b class="num">${t1(+ty.front_left)} °C</b></div>
+      <div><span class="lbl">Передняя правая</span><b class="num">${t1(+ty.front_right)} °C</b></div>
+      <div><span class="lbl">Задняя левая</span><b class="num">${t1(+ty.rear_left)} °C</b></div>
+      <div><span class="lbl">Задняя правая</span><b class="num">${t1(+ty.rear_right)} °C</b></div></div>`;
+  } else {
+    html+=`<h3>Телеметрия</h3><p class="muted" style="margin:0">Пакет заблокирован: его значения не попали в показатели и график.</p>`;
+  }
+  html+=`<h3>Исходные данные</h3><pre>${esc(JSON.stringify(e.raw,null,2))}</pre>`;
+  if(!ui.follow) html+=`<p style="margin:12px 0 0"><button class="btn follow" type="button" id="bFollow">Следить за новыми сообщениями</button></p>`;
+  $('dBody').innerHTML=html;
+  const bf=$('bFollow'); if(bf) bf.onclick=()=>{ui.follow=true;ui.offset=0;loadEvents();};
+}
+
+/* ---------- polling ---------- */
+let busy=false;
+async function poll(){
+  if(busy) return; busy=true;
+  try{
+    const s=await api('/api/state?car='+ui.car);
+    renderState(s);
+    if(s.version!==ui.version){ ui.version=s.version; await loadEvents(); }
+  }catch(e){ $('stText').textContent='Нет связи с сервером: запустите python dashboard.py'; $('stDot').className='dot'; }
+  finally{ busy=false; }
+}
+poll(); setInterval(poll,500);
+})();
+</script>
+</body>
+</html>

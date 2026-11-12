@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+security_log.txt
+accepted_messages.json
+accepted_messages.json.tmp
+build/
+dist/
+*.spec
+*.exe
+*.zip
