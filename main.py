@@ -234,18 +234,18 @@ def run_server():
             self.end_headers()
             self.wfile.write(body)
     with HTTPServer(("127.0.0.1", 8000), Handler) as server:
-        print("CyberShield запущен: http://127.0.0.1:8000")
+        print("CyberShield running: http://127.0.0.1:8000")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
-            print("\nСервер остановлен")
+            print("\nServer stopped")
 
 if __name__ == "__main__":
     car_01_message = generate_message(1, "car_01", "car_sensor_01")
     car_02_message = generate_message(1, "car_02", "car_sensor_02")
 
-    print("Болид 1:", car_01_message)
-    print("Болид 2:", car_02_message)
+    print("Car 1:", car_01_message)
+    print("Car 2:", car_02_message)
     
     assert get_warnings(250, 95) == []
     assert get_warnings(315, 120) == ["Unusual speed", "High engine temperature"]

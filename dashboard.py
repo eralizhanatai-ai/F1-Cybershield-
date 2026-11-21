@@ -47,12 +47,12 @@ INCIDENT_CHANCE = 0.06  # вероятность тестового инциде
 # Сценарии генератора. Они описывают, КАК пакет был создан для проверки щита.
 # Решение о пакете всегда принимает только main.process_packet.
 SCENARIOS = {
-    "normal": "Обычный пакет",
-    "alert": "Значение за учебным порогом (подписано честно)",
-    "tamper": "Подмена: скорость изменена после подписи",
-    "replay": "Повтор: отправлен уже принятый пакет",
-    "malformed": "Неправильный формат пакета",
-    "unknown_source": "Чужой датчик (подписан, но не зарегистрирован)",
+    "normal": "Normal packet",
+    "alert": "Reading outside demo threshold (valid signature)",
+    "tamper": "Tampering: speed changed after signing",
+    "replay": "Replay: an accepted packet sent again",
+    "malformed": "Malformed packet",
+    "unknown_source": "Unknown sensor (signed but not registered)",
 }
 INCIDENT_SCENARIOS = ("alert", "tamper", "replay", "malformed", "unknown_source")
 
@@ -66,48 +66,48 @@ HMAC_NOT_CHECKED = {
 }
 
 REASONS_RU = {
-    "Invalid packet format": "Неверный формат пакета",
-    "Missing message": "В пакете нет сообщения",
-    "Invalid message format": "Неверный формат сообщения",
-    "Missing signature": "Нет подписи",
-    "Invalid signature type": "Неверный тип подписи",
-    "Authentication failed": "Подпись не совпадает (HMAC)",
-    "Invalid sequence": "Неверный номер пакета",
-    "Replay detected": "Повтор пакета",
-    "Missing Speed": "Нет скорости",
-    "Missing Source": "Нет источника",
-    "Missing engine temperature": "Нет температуры двигателя",
-    "Missing tyre temperatures": "Нет температур шин",
-    "Invalid source type": "Неверный тип источника",
-    "Unknown source": "Неизвестный источник",
-    "Missing or invalid car_id": "Нет или неверный car_id",
-    "Unknown car": "Неизвестный болид",
-    "Source does not match car": "Источник не принадлежит болиду",
-    "Invalid data type": "Неверный тип данных скорости",
-    "Invalid temperature data type": "Неверный тип температуры двигателя",
-    "Invalid speed": "Отрицательная скорость",
-    "Invalid tyre data format": "Неверный формат температур шин",
-    "Unusual speed": "Необычно высокая скорость",
-    "High engine temperature": "Высокая температура двигателя",
-    "Low engine temperature": "Низкая температура двигателя",
+    "Invalid packet format": "Invalid packet format",
+    "Missing message": "Missing message",
+    "Invalid message format": "Invalid message format",
+    "Missing signature": "Missing signature",
+    "Invalid signature type": "Invalid signature type",
+    "Authentication failed": "HMAC signature mismatch",
+    "Invalid sequence": "Invalid sequence number",
+    "Replay detected": "Replay detected",
+    "Missing Speed": "Missing speed",
+    "Missing Source": "Missing source",
+    "Missing engine temperature": "Missing engine temperature",
+    "Missing tyre temperatures": "Missing tyre temperatures",
+    "Invalid source type": "Invalid source type",
+    "Unknown source": "Unknown source",
+    "Missing or invalid car_id": "Missing or invalid car_id",
+    "Unknown car": "Unknown car",
+    "Source does not match car": "Source does not match car",
+    "Invalid data type": "Invalid speed data type",
+    "Invalid temperature data type": "Invalid engine temperature type",
+    "Invalid speed": "Negative speed",
+    "Invalid tyre data format": "Invalid tyre temperature format",
+    "Unusual speed": "Unusually high speed",
+    "High engine temperature": "High engine temperature",
+    "Low engine temperature": "Low engine temperature",
 }
 WHEELS_RU = {
-    "front_left": "передняя левая",
-    "front_right": "передняя правая",
-    "rear_left": "задняя левая",
-    "rear_right": "задняя правая",
+    "front_left": "front left",
+    "front_right": "front right",
+    "rear_left": "rear left",
+    "rear_right": "rear right",
 }
 WHEEL_PREFIXES_RU = (
-    ("Missing tyre temperature:", "Нет температуры шины"),
-    ("Invalid tyre temperature type:", "Неверный тип температуры шины"),
-    ("Non-finite tyre temperature:", "Недопустимое значение температуры шины"),
-    ("Low tyre temperature:", "Низкая температура шины"),
-    ("High tyre temperature:", "Высокая температура шины"),
+    ("Missing tyre temperature:", "Missing tyre temperature"),
+    ("Invalid tyre temperature type:", "Invalid tyre temperature type"),
+    ("Non-finite tyre temperature:", "Non-finite tyre temperature"),
+    ("Low tyre temperature:", "Low tyre temperature"),
+    ("High tyre temperature:", "High tyre temperature"),
 )
 
 
 def reason_ru(code):
-    """Переводит строку результата ядра на русский. Исходный код тоже сохраняется."""
+    """Returns a readable English result label while retaining the original result code."""
     if code in REASONS_RU:
         return REASONS_RU[code]
     for prefix, text in WHEEL_PREFIXES_RU:
@@ -144,10 +144,10 @@ def _claimed(message, key):
 
 
 class CarStats:
-    """Принятая телеметрия одного болида. Сюда попадают только Allow и Alert."""
+    """Accepted telemetry одного болида. Сюда попадают только Allow и Alert."""
 
     def __init__(self):
-        self.samples = deque(maxlen=600)  # (время, скорость) для графика
+        self.samples = deque(maxlen=600)  # (время, speed) для графика
         self.last = None                  # последнее принятое сообщение
         self.max_speed = None
         self.area = 0.0                   # интеграл скорости по времени
@@ -174,7 +174,7 @@ class CarStats:
         }
 
     def break_interval(self):
-        """Пауза или остановка: следующий интервал не склеивается с предыдущим."""
+        """Pause или остановка: следующий интервал не склеивается с предыдущим."""
         self.prev = None
 
     def average(self):
@@ -217,7 +217,7 @@ class ShieldSession:
 
     @staticmethod
     def _next_free_sequence(source):
-        """Новая сессия продолжает нумерацию после самого большого принятого номера.
+        """New session продолжает нумерацию после самого большого принятого номера.
 
         Память о повторах (main.seen_packets) при этом не очищается, поэтому
         старые пакеты по-прежнему будут блокироваться как повтор.
@@ -555,11 +555,11 @@ def make_handler(session, port):
             elif path == "/api/send":
                 with session.lock:
                     if session.state != "running":
-                        self._send(409, {"error": "Тестовый пакет можно отправить только во время симуляции"})
+                        self._send(409, {"error": "Start the simulation before sending a test packet"})
                         return
                     record = session.send_scenario(body.get("scenario"), body.get("car"))
                 if record is None:
-                    self._send(409, {"error": "Для повтора нужен хотя бы один принятый пакет этого болида"})
+                    self._send(409, {"error": "Replay needs at least one accepted packet for this car"})
                 else:
                     self._send(200, {"ok": True, "id": record["id"]})
             else:
@@ -572,11 +572,11 @@ def run(port=PORT):
     os.chdir(HERE)  # security_log.txt из main.py пишется в папку проекта
     session = ShieldSession()
     server = ThreadingHTTPServer((HOST, port), make_handler(session, port))
-    print(f"F1 CyberShield: откройте http://{HOST}:{port}  (остановка: Ctrl+C)")
+    print(f"F1 CyberShield: open http://{HOST}:{port}  (stop: Ctrl+C)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nСервер остановлен")
+        print("\nServer stopped")
     finally:
         session.shutdown()
         server.server_close()

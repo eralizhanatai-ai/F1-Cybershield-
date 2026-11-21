@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -194,57 +194,57 @@ pre{font-family:var(--f-mono);font-size:11.5px;line-height:1.55;background:rgba(
     <div class="row">
       <div class="logo">
         <svg width="30" height="30" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M14 2.5 4 6.5v7c0 6 4.3 10.4 10 12 5.7-1.6 10-6 10-12v-7l-10-4Z" stroke="#C9F24B" stroke-width="1.6"/><path d="M8.5 15.5h5l1.5-4 2 6 1.2-2h1.3" stroke="#C9F24B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <div>F1 CyberShield<small>Учебная симуляция телеметрии</small></div>
+        <div>F1 CyberShield<small>Educational telemetry simulation</small></div>
       </div>
-      <span class="pill sim">Симуляция</span>
+      <span class="pill sim">Simulation</span>
       <span class="spacer"></span>
-      <span class="lbl">Болид</span>
-      <div class="seg" id="seg" data-i="0" role="group" aria-label="Выбор болида">
+      <span class="lbl">Car</span>
+      <div class="seg" id="seg" data-i="0" role="group" aria-label="Select car">
         <span class="ind"></span>
-        <button type="button" id="car0" aria-pressed="true">Болид 01</button>
-        <button type="button" id="car1" aria-pressed="false">Болид 02</button>
+        <button type="button" id="car0" aria-pressed="true">Car 01</button>
+        <button type="button" id="car1" aria-pressed="false">Car 02</button>
       </div>
-      <div class="clock"><span class="lbl">Время сессии</span><b class="num" id="sessT">00:00:00</b></div>
+      <div class="clock"><span class="lbl">Session time</span><b class="num" id="sessT">00:00:00</b></div>
     </div>
     <div class="row">
-      <span class="pill" id="stPill"><span class="dot" id="stDot"></span><span id="stText">Сессия не начата</span></span>
-      <button class="btn primary" id="bStart" type="button">Начать симуляцию</button>
-      <button class="btn" id="bPause" type="button">Пауза</button>
-      <button class="btn" id="bResume" type="button">Продолжить</button>
-      <button class="btn danger" id="bStop" type="button">Завершить сессию</button>
+      <span class="pill" id="stPill"><span class="dot" id="stDot"></span><span id="stText">Session not started</span></span>
+      <button class="btn primary" id="bStart" type="button">Start simulation</button>
+      <button class="btn" id="bPause" type="button">Pause</button>
+      <button class="btn" id="bResume" type="button">Resume</button>
+      <button class="btn danger" id="bStop" type="button">End session</button>
       <span class="sep"></span>
-      <label class="lbl" for="scen">Тестовый пакет</label>
+      <label class="lbl" for="scen">Test packet</label>
       <select class="select" id="scen"></select>
-      <button class="btn" id="bSend" type="button">Отправить</button>
-      <label class="check"><input type="checkbox" id="incid"> Случайные инциденты</label>
+      <button class="btn" id="bSend" type="button">Send</button>
+      <label class="check"><input type="checkbox" id="incid"> Random incidents</label>
       <span class="toast" id="toast" role="status"></span>
     </div>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="kpis" aria-label="Показатели">
-    <div class="card kpi"><div class="lbl">Текущая скорость</div><div class="v num" id="kNow"></div><div class="f" id="kNowF">выбранный болид</div></div>
-    <div class="card kpi"><div class="lbl">Максимальная</div><div class="v num" id="kMax"></div><div class="f">за сессию</div></div>
-    <div class="card kpi"><div class="lbl">Средняя за сессию</div><div class="v num" id="kAvg"></div><div class="f" id="kAvgF" title="Интеграл скорости по времени получения пакетов, делённый на учтённое время. Интервалы больше 3 с и паузы не учитываются.">по времени получения</div></div>
-    <div class="card kpi ok"><div class="lbl">Без предупреждений</div><div class="v num" id="nAllow">0</div><div class="f">оба болида</div></div>
-    <div class="card kpi wa"><div class="lbl">Предупреждения</div><div class="v num" id="nAlert">0</div><div class="f">приняты с пометкой</div></div>
-    <div class="card kpi bl"><div class="lbl">Заблокировано</div><div class="v num" id="nBlk">0</div><div class="f">не попали в телеметрию</div></div>
+  <section class="kpis" aria-label="Metrics">
+    <div class="card kpi"><div class="lbl">Current speed</div><div class="v num" id="kNow"></div><div class="f" id="kNowF">selected car</div></div>
+    <div class="card kpi"><div class="lbl">Maximum speed</div><div class="v num" id="kMax"></div><div class="f">this session</div></div>
+    <div class="card kpi"><div class="lbl">Session average</div><div class="v num" id="kAvg"></div><div class="f" id="kAvgF" title="Speed integrated over packet arrival time, divided by the included time. Pauses and gaps over 3 seconds are excluded.">weighted by arrival time</div></div>
+    <div class="card kpi ok"><div class="lbl">No warnings</div><div class="v num" id="nAllow">0</div><div class="f">both cars</div></div>
+    <div class="card kpi wa"><div class="lbl">Warnings</div><div class="v num" id="nAlert">0</div><div class="f">accepted with warnings</div></div>
+    <div class="card kpi bl"><div class="lbl">Blocked</div><div class="v num" id="nBlk">0</div><div class="f">excluded from telemetry</div></div>
   </section>
 
   <div class="main">
     <div class="left">
       <section class="card" style="animation-delay:.05s">
         <div class="card-h">
-          <h2>Телеметрия</h2>
-          <span class="muted r" id="lastRx">Последние принятые данные: —</span>
+          <h2>Telemetry</h2>
+          <span class="muted r" id="lastRx">Last accepted data: —</span>
           <span class="badge" id="fresh" hidden></span>
         </div>
         <div class="tele" id="teleBox">
           <div class="chassis">
-            <div class="tyre fl" id="tFL" data-st="none"><div class="lbl">Передняя левая</div><div class="t num">—</div><div class="s">нет данных</div></div>
-            <div class="tyre fr" id="tFR" data-st="none"><div class="lbl">Передняя правая</div><div class="t num">—</div><div class="s">нет данных</div></div>
-            <svg viewBox="0 0 200 360" role="img" aria-label="Схема болида, вид сверху">
+            <div class="tyre fl" id="tFL" data-st="none"><div class="lbl">Front left</div><div class="t num">—</div><div class="s">no data</div></div>
+            <div class="tyre fr" id="tFR" data-st="none"><div class="lbl">Front right</div><div class="t num">—</div><div class="s">no data</div></div>
+            <svg viewBox="0 0 200 360" role="img" aria-label="Car schematic, top view">
               <rect x="26" y="18" width="148" height="14" rx="4" class="car-body"/>
               <path d="M93 32 L107 32 L113 118 L87 118 Z" class="car-body"/>
               <path d="M58 92 L86 100 M142 92 L114 100 M58 112 L87 112 M142 112 L113 112" class="car-line"/>
@@ -259,56 +259,56 @@ pre{font-family:var(--f-mono);font-size:11.5px;line-height:1.55;background:rgba(
               <rect x="18" y="250" width="38" height="62" rx="9" class="wheel" id="wRL" fill="#3a3f35"/>
               <rect x="144" y="250" width="38" height="62" rx="9" class="wheel" id="wRR" fill="#3a3f35"/>
             </svg>
-            <div class="tyre rl" id="tRL" data-st="none"><div class="lbl">Задняя левая</div><div class="t num">—</div><div class="s">нет данных</div></div>
-            <div class="tyre rr" id="tRR" data-st="none"><div class="lbl">Задняя правая</div><div class="t num">—</div><div class="s">нет данных</div></div>
+            <div class="tyre rl" id="tRL" data-st="none"><div class="lbl">Rear left</div><div class="t num">—</div><div class="s">no data</div></div>
+            <div class="tyre rr" id="tRR" data-st="none"><div class="lbl">Rear right</div><div class="t num">—</div><div class="s">no data</div></div>
           </div>
           <div class="engine" id="eng" data-st="none">
-            <div class="lbl">Температура двигателя</div>
-            <div class="muted" style="font-size:12px">охлаждающая жидкость</div>
+            <div class="lbl">Engine temperature</div>
+            <div class="muted" style="font-size:12px">coolant</div>
             <div class="t num" id="engT">—</div>
-            <div class="muted" style="font-size:12px" id="engS">нет данных</div>
+            <div class="muted" style="font-size:12px" id="engS">no data</div>
           </div>
         </div>
       </section>
 
       <section class="card" style="animation-delay:.1s">
-        <div class="card-h"><h2>Скорость</h2><span class="muted">последние 60 секунд, только принятые пакеты</span></div>
-        <div class="chartbox"><canvas id="chart" role="img" aria-label="График скорости за последние 60 секунд"></canvas><div class="chart-empty" id="chartEmpty">Нет данных</div></div>
+        <div class="card-h"><h2>Speed</h2><span class="muted">last 60 seconds · accepted packets only</span></div>
+        <div class="chartbox"><canvas id="chart" role="img" aria-label="Speed chart for the last 60 seconds"></canvas><div class="chart-empty" id="chartEmpty">No data</div></div>
       </section>
 
       <section class="card" style="animation-delay:.15s">
         <div class="card-h">
-          <h2>Журнал сообщений</h2>
-          <div class="filters r" role="group" aria-label="Фильтр журнала">
-            <button type="button" data-f="all" aria-pressed="true">Все</button>
-            <button type="button" data-f="accepted" aria-pressed="false">Принятые</button>
-            <button type="button" data-f="alert" aria-pressed="false">Предупреждения</button>
-            <button type="button" data-f="blocked" aria-pressed="false">Блокировки</button>
+          <h2>Message log</h2>
+          <div class="filters r" role="group" aria-label="Log filter">
+            <button type="button" data-f="all" aria-pressed="true">All</button>
+            <button type="button" data-f="accepted" aria-pressed="false">Accepted</button>
+            <button type="button" data-f="alert" aria-pressed="false">Warnings</button>
+            <button type="button" data-f="blocked" aria-pressed="false">Blocked</button>
           </div>
         </div>
         <div class="tablebox">
           <table>
-            <thead><tr><th>Время ▾</th><th>Болид</th><th>Источник</th><th>№</th><th>Статус</th><th>Причина</th></tr></thead>
+            <thead><tr><th>Time ▾</th><th>Car</th><th>Source</th><th>№</th><th>Status</th><th>Reason</th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
-        <div class="empty" id="rowsEmpty">Пока нет сообщений. Нажмите «Начать симуляцию».</div>
+        <div class="empty" id="rowsEmpty">No messages yet. Select “Start simulation”.</div>
         <div class="pager">
-          <span id="pgInfo">Показано 0 из 0</span>
+          <span id="pgInfo">Showing 0 of 0</span>
           <span class="muted" id="pgLimit"></span>
           <div class="r">
-            <button class="btn" id="pgPrev" type="button">‹ Назад</button>
+            <button class="btn" id="pgPrev" type="button">Previous</button>
             <span class="num" id="pgNum">1</span>
-            <button class="btn" id="pgNext" type="button">Далее ›</button>
+            <button class="btn" id="pgNext" type="button">Next</button>
           </div>
         </div>
       </section>
     </div>
 
     <aside class="card detail" id="detail" style="animation-delay:.08s" aria-live="polite">
-      <div class="card-h"><h2>Детали сообщения</h2><span class="r" id="dStatus"></span></div>
-      <div id="dBody"><div class="empty">Выберите строку в журнале, чтобы увидеть подробности.</div></div>
-      <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 4.6v.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Заблокированные пакеты не обновляют показатели, график, максимальную и среднюю скорость.</div>
+      <div class="card-h"><h2>Message details</h2><span class="r" id="dStatus"></span></div>
+      <div id="dBody"><div class="empty">Select a log entry to see its details.</div></div>
+      <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 4.6v.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Blocked packets do not update telemetry, the chart, maximum speed or average speed.</div>
     </aside>
   </div>
 </main>
@@ -321,8 +321,8 @@ const fmtT = ms => { const d=new Date(ms); return `${pad(d.getHours())}:${pad(d.
 const fmtTms = ms => fmtT(ms)+'.'+String(new Date(ms).getMilliseconds()).padStart(3,'0');
 const t1 = v => v==null ? '—' : v.toFixed(1);
 const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const STATUS_RU = {Allow:'Принято',Alert:'Предупреждение',Blocked:'Заблокировано'};
-const HMAC_RU = {passed:['Пройдена','ok-t'],failed:['Не пройдена','bad-t'],not_checked:['Не выполнялась: пакет отклонён раньше','muted']};
+const STATUS_RU = {Allow:'Accepted',Alert:'Warning',Blocked:'Blocked'};
+const HMAC_RU = {passed:['Passed','ok-t'],failed:['Failed','bad-t'],not_checked:['Not checked: packet rejected earlier','muted']};
 const WHEELS = {FL:'front_left',FR:'front_right',RL:'rear_left',RR:'rear_right'};
 
 const ui = {car:'car_01', filter:'all', offset:0, size:8, selected:null, follow:true, version:-1, state:null, seenTop:0, counters:null};
@@ -362,12 +362,12 @@ let scenFilled=false;
 function renderState(s){
   if(!scenFilled){ $('scen').innerHTML=Object.entries(s.scenarios).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join(''); scenFilled=true; }
   const st=s.state;
-  const txt={idle:'Сессия не начата',running:'Симуляция идёт',paused:'Пауза',ended:'Сессия завершена'}[st];
+  const txt={idle:'Session not started',running:'Simulation running',paused:'Pause',ended:'Session ended'}[st];
   $('stText').textContent=txt; $('stDot').className='dot'+(st==='running'?' on':st==='paused'?' pause':'');
   $('bStart').disabled=!(st==='idle'||st==='ended');
   $('bPause').disabled=st!=='running'; $('bResume').disabled=st!=='paused'; $('bStop').disabled=!(st==='running'||st==='paused');
   $('bSend').disabled=st!=='running'; $('scen').disabled=st!=='running';
-  $('bStart').textContent = st==='ended' ? 'Новая сессия' : 'Начать симуляцию';
+  $('bStart').textContent = st==='ended' ? 'New session' : 'Start simulation';
   $('incid').checked=s.incidents;
   const e=Math.floor(s.elapsed); $('sessT').textContent=`${pad(Math.floor(e/3600))}:${pad(Math.floor(e/60)%60)}:${pad(e%60)}`;
 
@@ -377,38 +377,38 @@ function renderState(s){
     if(prev && (c[k]||0)>(prev[k]||0)){el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
   });
   ui.counters=c;
-  $('pgLimit').textContent = s.stored>=s.history_limit ? `хранятся последние ${s.history_limit}` : '';
+  $('pgLimit').textContent = s.stored>=s.history_limit ? `last ${s.history_limit} stored` : '';
 
   const car=s.car, L=car.last;
-  const val=(id,v,unit,warn)=>{const el=$(id); if(v==null){el.className='v none';el.textContent='Нет данных';} else {el.className='v num'+(warn?' warn':'');el.innerHTML=`${v}<small>${unit}</small>`;}};
+  const val=(id,v,unit,warn)=>{const el=$(id); if(v==null){el.className='v none';el.textContent='No data';} else {el.className='v num'+(warn?' warn':'');el.innerHTML=`${v}<small>${unit}</small>`;}};
   const unusual = L && L.warnings.includes('Unusual speed');
-  val('kNow', L?Math.round(L.speed):null, 'км/ч', unusual);
-  $('kNowF').textContent = unusual ? 'необычно высокая скорость' : (car.stale && L ? 'устарело' : 'выбранный болид');
-  val('kMax', car.max_speed!=null?Math.round(car.max_speed):null, 'км/ч');
-  val('kAvg', car.avg_speed!=null?Math.round(car.avg_speed):null, 'км/ч');
-  $('kAvgF').textContent = car.avg_speed!=null ? `по времени, учтено ${Math.round(car.avg_seconds)} с` : 'нужно минимум 2 пакета подряд';
+  val('kNow', L?Math.round(L.speed):null, 'km/h', unusual);
+  $('kNowF').textContent = unusual ? 'unusually high speed' : (car.stale && L ? 'stale' : 'selected car');
+  val('kMax', car.max_speed!=null?Math.round(car.max_speed):null, 'km/h');
+  val('kAvg', car.avg_speed!=null?Math.round(car.avg_speed):null, 'km/h');
+  $('kAvgF').textContent = car.avg_speed!=null ? `time-weighted · ${Math.round(car.avg_seconds)} s included` : 'needs at least 2 consecutive packets';
 
-  $('lastRx').textContent='Последние принятые данные: '+(L?fmtT(L.received_ms):'—');
+  $('lastRx').textContent='Last accepted data: '+(L?fmtT(L.received_ms):'—');
   const fr=$('fresh');
-  if(!L){fr.hidden=true;} else {fr.hidden=false; fr.className='badge '+(car.stale?'stale':'fresh'); fr.textContent=car.stale?(st==='running'?'устарело':'поступление остановлено'):'в эфире';}
+  if(!L){fr.hidden=true;} else {fr.hidden=false; fr.className='badge '+(car.stale?'stale':'fresh'); fr.textContent=car.stale?(st==='running'?'stale':'updates stopped'):'live';}
   $('teleBox').classList.toggle('stale-dim', !!(L && car.stale));
 
   Object.entries(WHEELS).forEach(([k,w])=>{
     const box=$('t'+k), wheel=$('w'+k);
-    if(!L){box.dataset.st='none';box.querySelector('.t').textContent='—';box.querySelector('.s').textContent='нет данных';wheel.setAttribute('fill','#3a3f35');return;}
+    if(!L){box.dataset.st='none';box.querySelector('.t').textContent='—';box.querySelector('.s').textContent='no data';wheel.setAttribute('fill','#3a3f35');return;}
     const hi=L.warnings.includes('High tyre temperature: '+w), lo=L.warnings.includes('Low tyre temperature: '+w);
     const stt=hi?'hot':lo?'cold':'ok';
     box.dataset.st=stt; box.querySelector('.t').innerHTML=`${t1(L.tyres[w])}<small> °C</small>`;
-    box.querySelector('.s').textContent = hi?'выше учебного порога':lo?'ниже учебного порога':'без предупреждений';
+    box.querySelector('.s').textContent = hi?'above demo threshold':lo?'below demo threshold':'no warnings';
     wheel.setAttribute('fill', getComputedStyle(box).getPropertyValue('--tc').trim()||'#C9F24B');
   });
   const eng=$('eng');
-  if(!L){eng.dataset.st='none';$('engT').textContent='—';$('engS').textContent='нет данных';}
+  if(!L){eng.dataset.st='none';$('engT').textContent='—';$('engS').textContent='no data';}
   else{
     const hi=L.warnings.includes('High engine temperature'), lo=L.warnings.includes('Low engine temperature');
     eng.dataset.st=hi?'hot':lo?'cold':'ok';
     $('engT').innerHTML=`${t1(L.engine_temperature)}<small> °C</small>`;
-    $('engS').textContent=hi?'выше учебного порога':lo?'ниже учебного порога':'без предупреждений';
+    $('engS').textContent=hi?'above demo threshold':lo?'below demo threshold':'no warnings';
   }
   drawChart(car);
 }
@@ -446,7 +446,7 @@ function drawChart(car){
 }
 
 /* ---------- log table ---------- */
-const cell=(v,confirmed)=> v==null ? '<span class="undef">Не определено</span>' : confirmed ? esc(v) : `<span class="claimed" title="Указано в пакете, но не подтверждено: пакет заблокирован">${esc(v)}</span>`;
+const cell=(v,confirmed)=> v==null ? '<span class="undef">Unknown</span>' : confirmed ? esc(v) : `<span class="claimed" title="Claimed in the packet, not verified: packet blocked">${esc(v)}</span>`;
 async function loadEvents(){
   const d=await api(`/api/events?filter=${ui.filter}&offset=${ui.offset}&limit=${ui.size}`);
   if(ui.offset>0 && ui.offset>=d.total){ui.offset=Math.max(0,Math.floor((d.total-1)/ui.size)*ui.size); return loadEvents();}
@@ -458,7 +458,7 @@ async function loadEvents(){
   if(ui.offset===0) ui.seenTop=Math.max(ui.seenTop,top);
   $('rowsEmpty').hidden=d.total>0;
   const a=d.total?ui.offset+1:0, b=ui.offset+d.rows.length;
-  $('pgInfo').textContent=`Показано ${a}–${b} из ${d.total}`;
+  $('pgInfo').textContent=`Showing ${a}–${b} of ${d.total}`;
   $('pgNum').textContent=Math.floor(ui.offset/ui.size)+1;
   $('pgPrev').disabled=ui.offset===0; $('pgNext').disabled=b>=d.total;
   $('rows').querySelectorAll('tr').forEach(tr=>{
@@ -476,36 +476,36 @@ async function selectEvent(id){
   try{ renderDetail(await api('/api/event?id='+id)); }catch(e){ renderDetail(null); }
 }
 function renderDetail(e){
-  if(!e){$('dStatus').innerHTML='';$('dBody').innerHTML='<div class="empty">Выберите строку в журнале, чтобы увидеть подробности.</div>';return;}
+  if(!e){$('dStatus').innerHTML='';$('dBody').innerHTML='<div class="empty">Select a log entry to see its details.</div>';return;}
   $('dStatus').innerHTML=`<span class="status ${e.status}">${STATUS_RU[e.status]}</span>`;
   const acc=e.accepted, hm=HMAC_RU[e.hmac];
-  const confirmedNote = acc ? '' : ' <span class="muted" style="font-size:12px">(из пакета, не подтверждено)</span>';
-  const v=(x)=> x==null ? '<span class="undef">Не определено</span>' : esc(x)+confirmedNote;
-  const reasons = e.status==='Allow' ? '<span class="ok-t">Нет</span>' :
+  const confirmedNote = acc ? '' : ' <span class="muted" style="font-size:12px">(claimed, not verified)</span>';
+  const v=(x)=> x==null ? '<span class="undef">Unknown</span>' : esc(x)+confirmedNote;
+  const reasons = e.status==='Allow' ? '<span class="ok-t">None</span>' :
     `<ul class="reasons">${e.reasons.map(r=>`<li class="${e.status==='Blocked'?'bad-t':'warn-t'}">${esc(r.text)}<code>${esc(r.code)}</code></li>`).join('')}</ul>`;
   let html=`<dl class="kv">
-    <dt>Время получения</dt><dd class="mono">${fmtTms(e.received_ms)}</dd>
-    <dt>Болид</dt><dd>${v(e.car_id)}</dd>
-    <dt>Источник</dt><dd class="mono">${v(e.source)}</dd>
-    <dt>Номер пакета</dt><dd class="mono">${v(e.sequence)}</dd>
-    <dt>Проверка HMAC</dt><dd class="${hm[1]}">${hm[0]}</dd>
-    <dt>${e.status==='Blocked'?'Причина блокировки':'Предупреждения'}</dt><dd>${reasons}</dd>
-    ${e.scenario_text?`<dt>Сценарий генератора</dt><dd class="muted">${esc(e.scenario_text)}</dd>`:''}
+    <dt>Received at</dt><dd class="mono">${fmtTms(e.received_ms)}</dd>
+    <dt>Car</dt><dd>${v(e.car_id)}</dd>
+    <dt>Source</dt><dd class="mono">${v(e.source)}</dd>
+    <dt>Sequence number</dt><dd class="mono">${v(e.sequence)}</dd>
+    <dt>HMAC verification</dt><dd class="${hm[1]}">${hm[0]}</dd>
+    <dt>${e.status==='Blocked'?'Block reason':'Warnings'}</dt><dd>${reasons}</dd>
+    ${e.scenario_text?`<dt>Generator scenario</dt><dd class="muted">${esc(e.scenario_text)}</dd>`:''}
   </dl>`;
   if(acc){
     const m=e.raw.message, ty=m.tyre_temperatures;
-    html+=`<h3>Принятая телеметрия</h3><div class="acc">
-      <div><span class="lbl">Скорость</span><b class="num">${Math.round(m.speed)} км/ч</b></div>
-      <div><span class="lbl">Двигатель (ОЖ)</span><b class="num">${t1(+m.engine_temperature)} °C</b></div>
-      <div><span class="lbl">Передняя левая</span><b class="num">${t1(+ty.front_left)} °C</b></div>
-      <div><span class="lbl">Передняя правая</span><b class="num">${t1(+ty.front_right)} °C</b></div>
-      <div><span class="lbl">Задняя левая</span><b class="num">${t1(+ty.rear_left)} °C</b></div>
-      <div><span class="lbl">Задняя правая</span><b class="num">${t1(+ty.rear_right)} °C</b></div></div>`;
+    html+=`<h3>Accepted telemetry</h3><div class="acc">
+      <div><span class="lbl">Speed</span><b class="num">${Math.round(m.speed)} km/h</b></div>
+      <div><span class="lbl">Engine (coolant)</span><b class="num">${t1(+m.engine_temperature)} °C</b></div>
+      <div><span class="lbl">Front left</span><b class="num">${t1(+ty.front_left)} °C</b></div>
+      <div><span class="lbl">Front right</span><b class="num">${t1(+ty.front_right)} °C</b></div>
+      <div><span class="lbl">Rear left</span><b class="num">${t1(+ty.rear_left)} °C</b></div>
+      <div><span class="lbl">Rear right</span><b class="num">${t1(+ty.rear_right)} °C</b></div></div>`;
   } else {
-    html+=`<h3>Телеметрия</h3><p class="muted" style="margin:0">Пакет заблокирован: его значения не попали в показатели и график.</p>`;
+    html+=`<h3>Telemetry</h3><p class="muted" style="margin:0">Packet blocked: its values were excluded from telemetry and the chart.</p>`;
   }
-  html+=`<h3>Исходные данные</h3><pre>${esc(JSON.stringify(e.raw,null,2))}</pre>`;
-  if(!ui.follow) html+=`<p style="margin:12px 0 0"><button class="btn follow" type="button" id="bFollow">Следить за новыми сообщениями</button></p>`;
+  html+=`<h3>Raw packet</h3><pre>${esc(JSON.stringify(e.raw,null,2))}</pre>`;
+  if(!ui.follow) html+=`<p style="margin:12px 0 0"><button class="btn follow" type="button" id="bFollow">Follow new messages</button></p>`;
   $('dBody').innerHTML=html;
   const bf=$('bFollow'); if(bf) bf.onclick=()=>{ui.follow=true;ui.offset=0;loadEvents();};
 }
@@ -518,7 +518,7 @@ async function poll(){
     const s=await api('/api/state?car='+ui.car);
     renderState(s);
     if(s.version!==ui.version){ ui.version=s.version; await loadEvents(); }
-  }catch(e){ $('stText').textContent='Нет связи с сервером: запустите python dashboard.py'; $('stDot').className='dot'; }
+  }catch(e){ $('stText').textContent='None связи с сервером: запустите python dashboard.py'; $('stDot').className='dot'; }
   finally{ busy=false; }
 }
 poll(); setInterval(poll,500);

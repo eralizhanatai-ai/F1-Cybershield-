@@ -6,6 +6,7 @@ An educational telemetry security simulator created by Erali Zhanatay with AI as
 
 ## Features
 
+- An interactive introduction to 12 car components, with an animated schematic and a transition to telemetry security.
 - Telemetry for two simulated cars: speed, engine temperature and four tyre temperatures.
 - Message validation and HMAC authentication with an intentionally public training key.
 - Replay detection during the current application process.
@@ -26,6 +27,16 @@ Open http://127.0.0.1:8050 in your browser. Stop the simulation in the dashboard
 
 ## Browser and mobile demo
 
+The hosted demo begins with the interactive car anatomy introduction and then opens the live security monitor.
+
+To preview the introduction and browser simulation from this repository, run:
+
+```sh
+python -m http.server 8000
+```
+
+Open http://127.0.0.1:8000 and select **Launch F1 CyberShield** to enter the monitor. This static preview is separate from `python dashboard.py`, which still opens the original Python-server dashboard. The browser simulation requires internet access to download Pyodide.
+
 Use the demo link above on a phone or computer. The browser version runs the original Python modules through Pyodide/WebAssembly. Each visitor has an independent simulation; refreshing the page resets it. Export logs before closing.
 
 `mobile.html` is a portable browser version containing the Python source and UI. It downloads Pyodide from a CDN, so internet access is required. On phones, opening local HTML depends on the file viewer and browser; the hosted link is the simplest option.
@@ -45,7 +56,8 @@ The provided suite covers the core and dashboard. The browser adaptation was als
 - `simulator.py`: artificial telemetry generation.
 - `dashboard.py` / `dashboard.html`: local server, simulation session and interface.
 - `test_cybershield.py` / `test_dashboard.py`: automated tests.
-- `mobile.html`: browser adaptation.
+- `index.html`: interactive introduction with the animated car anatomy.
+- `mobile.html`: browser adaptation and a link back to the introduction.
 
 ## Scope and limitations
 

@@ -55,8 +55,8 @@ if __name__ == "__main__":
             print(
                 car_id,
                 "№", sequence,
-                "скорость:", message["speed"],
-                "двигатель:", message["engine_temperature"],
+                "speed:", message["speed"],
+                "engine:", message["engine_temperature"],
                 status,
                 response["result"]
             )
@@ -78,4 +78,4 @@ if __name__ == "__main__":
     with output_path.open("w", encoding="utf-8") as file:
         json.dump(accepted_messages, file, indent=4)
 
-    print("Симуляция завершена. Принято:", len(accepted_messages))
+    print("Simulation ended. Accepted:", len(accepted_messages))
